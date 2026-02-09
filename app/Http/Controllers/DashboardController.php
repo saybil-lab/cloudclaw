@@ -18,7 +18,7 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         
-        $servers = $user->servers()
+        $assistants = $user->servers()
             ->whereNotIn('status', ['deleted'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -27,10 +27,12 @@ class DashboardController extends Controller
         $recentTransactions = $this->creditService->getTransactions($user, 5);
 
         return Inertia::render('Dashboard', [
-            'servers' => $servers,
+            'assistants' => $assistants,
             'creditBalance' => $creditBalance,
             'recentTransactions' => $recentTransactions,
             'serverTypes' => $this->provisioningService->getAvailableServerTypes(),
+            'billingMode' => $user->billing_mode,
+            'hasByokConfigured' => $user->hasByokConfigured(),
         ]);
     }
 }

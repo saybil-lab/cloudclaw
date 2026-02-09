@@ -23,22 +23,28 @@ class ServerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return Inertia::render('Servers/Index', [
-            'servers' => $servers,
+        return Inertia::render('Assistants/Index', [
+            'assistants' => $servers,
             'serverTypes' => $this->provisioningService->getAvailableServerTypes(),
+            'billingMode' => $request->user()->billing_mode,
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        return Inertia::render('Servers/Create', [
+        $user = $request->user();
+        
+        return Inertia::render('Assistants/Create', [
             'serverTypes' => $this->provisioningService->getAvailableServerTypes(),
-            'datacenters' => [
-                ['id' => 'fsn1', 'name' => 'Falkenstein, Germany'],
-                ['id' => 'nbg1', 'name' => 'Nuremberg, Germany'],
-                ['id' => 'hel1', 'name' => 'Helsinki, Finland'],
-                ['id' => 'ash', 'name' => 'Ashburn, USA'],
+            'locations' => [
+                ['id' => 'fsn1', 'name' => 'Allemagne (Falkenstein)', 'flag' => '🇩🇪'],
+                ['id' => 'nbg1', 'name' => 'Allemagne (Nuremberg)', 'flag' => '🇩🇪'],
+                ['id' => 'hel1', 'name' => 'Finlande (Helsinki)', 'flag' => '🇫🇮'],
+                ['id' => 'ash', 'name' => 'États-Unis (Ashburn)', 'flag' => '🇺🇸'],
             ],
+            'billingMode' => $user->billing_mode,
+            'hasByokConfigured' => $user->hasByokConfigured(),
+            'creditBalance' => $user->isCreditsMode() ? $user->getOrCreateCredit()->balance : null,
         ]);
     }
 
@@ -58,8 +64,8 @@ class ServerController extends Controller
                 $validated['datacenter']
             );
 
-            return redirect()->route('servers.show', $server)
-                ->with('success', 'Server is being provisioned. This may take a few minutes.');
+            return redirect()->route('assistants.show', $server)
+                ->with('success', 'Votre assistant est en cours de création. Cela peut prendre quelques minutes.');
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }
@@ -77,8 +83,8 @@ class ServerController extends Controller
         $serverData['vnc_password'] = $server->vnc_password;
         $serverData['email_password'] = $server->email_password;
 
-        return Inertia::render('Servers/Show', [
-            'server' => $serverData,
+        return Inertia::render('Assistants/Show', [
+            'assistant' => $serverData,
         ]);
     }
 
@@ -91,8 +97,8 @@ class ServerController extends Controller
 
         try {
             $this->provisioningService->deleteServer($server);
-            return redirect()->route('servers.index')
-                ->with('success', 'Server deleted successfully.');
+            return redirect()->route('assistants.index')
+                ->with('success', 'Assistant supprimé avec succès.');
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }
@@ -108,14 +114,14 @@ class ServerController extends Controller
 
         try {
             if ($action === 'on') {
-                $this->hetznerService->powerOn($server->hetzner_id);
+                $this->provisioningService->powerOn($server);
                 $server->update(['status' => 'running']);
             } elseif ($action === 'off') {
-                $this->hetznerService->powerOff($server->hetzner_id);
+                $this->provisioningService->powerOff($server);
                 $server->update(['status' => 'stopped']);
             }
 
-            return back()->with('success', 'Server power ' . $action . ' initiated.');
+            return back()->with('success', $action === 'on' ? 'Assistant démarré.' : 'Assistant arrêté.');
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }

@@ -7,6 +7,7 @@ use App\Http\Controllers\CreditController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ServerController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -26,15 +27,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Servers
-    Route::resource('servers', ServerController::class)->except(['edit', 'update']);
-    Route::post('/servers/{server}/power', [ServerController::class, 'power'])->name('servers.power');
+    // Assistants (anciennement Servers)
+    Route::get('/assistants', [ServerController::class, 'index'])->name('assistants.index');
+    Route::get('/assistants/create', [ServerController::class, 'create'])->name('assistants.create');
+    Route::post('/assistants', [ServerController::class, 'store'])->name('assistants.store');
+    Route::get('/assistants/{server}', [ServerController::class, 'show'])->name('assistants.show');
+    Route::delete('/assistants/{server}', [ServerController::class, 'destroy'])->name('assistants.destroy');
+    Route::post('/assistants/{server}/power', [ServerController::class, 'power'])->name('assistants.power');
+
+    // Legacy routes redirects
+    Route::redirect('/servers', '/assistants');
+    Route::redirect('/servers/create', '/assistants/create');
 
     // Credits
     Route::get('/credits', [CreditController::class, 'index'])->name('credits.index');
     Route::post('/credits/purchase', [CreditController::class, 'purchase'])->name('credits.purchase');
     Route::get('/credits/success', [CreditController::class, 'success'])->name('credits.success');
     Route::post('/credits/confirm', [CreditController::class, 'confirm'])->name('credits.confirm');
+
+    // Settings (Paramètres)
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings/billing-mode', [SettingsController::class, 'updateBillingMode'])->name('settings.billing-mode');
+    Route::post('/settings/hetzner-token', [SettingsController::class, 'updateHetznerToken'])->name('settings.hetzner-token');
+    Route::delete('/settings/hetzner-token', [SettingsController::class, 'removeHetznerToken'])->name('settings.hetzner-token.delete');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

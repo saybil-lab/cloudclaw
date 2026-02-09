@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage, Link } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { CreditCard, TrendingUp, TrendingDown, Wallet, CheckCircle2, AlertCircle } from 'lucide-react';
+import { CreditCard, TrendingUp, TrendingDown, Wallet, CheckCircle2, AlertCircle, Sparkles, ArrowLeft } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface Transaction {
@@ -42,16 +42,27 @@ interface Props {
     mockMode?: boolean;
 }
 
-import { Flash } from '@/types';
+interface Flash {
+    success?: string;
+    error?: string;
+    info?: string;
+}
+
+const typeLabels: Record<string, string> = {
+    purchase: 'Achat',
+    usage: 'Utilisation',
+    refund: 'Remboursement',
+    bonus: 'Bonus',
+};
 
 const typeIcons: Record<string, React.ReactNode> = {
     purchase: <TrendingUp className="h-4 w-4 text-green-500" />,
     usage: <TrendingDown className="h-4 w-4 text-red-500" />,
     refund: <TrendingUp className="h-4 w-4 text-blue-500" />,
-    bonus: <TrendingUp className="h-4 w-4 text-purple-500" />,
+    bonus: <Sparkles className="h-4 w-4 text-purple-500" />,
 };
 
-export default function CreditsIndex({ balance, transactions, packages, stripeKey, mockMode }: Props) {
+export default function CreditsIndex({ balance, transactions, packages, mockMode }: Props) {
     const { flash } = usePage().props as { flash?: Flash };
     const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
@@ -70,7 +81,7 @@ export default function CreditsIndex({ balance, transactions, packages, stripeKe
 
     const handlePurchase = async (amount: number) => {
         if (!amount || amount < 5) {
-            setMessage({ type: 'error', text: 'Minimum purchase amount is €5' });
+            setMessage({ type: 'error', text: 'Le montant minimum est de 5€' });
             return;
         }
 
@@ -96,7 +107,7 @@ export default function CreditsIndex({ balance, transactions, packages, stripeKe
 
             // Mock mode - credits added directly
             if (data.mock || data.success) {
-                setMessage({ type: 'success', text: `€${amount} credits added successfully!` });
+                setMessage({ type: 'success', text: `${amount}€ de crédits ajoutés avec succès !` });
                 router.reload();
                 return;
             }
@@ -122,15 +133,15 @@ export default function CreditsIndex({ balance, transactions, packages, stripeKe
                 });
 
                 if (confirmResponse.ok) {
-                    setMessage({ type: 'success', text: 'Payment successful! Credits added.' });
+                    setMessage({ type: 'success', text: 'Paiement réussi ! Crédits ajoutés.' });
                     router.reload();
                 } else {
-                    setMessage({ type: 'error', text: 'Payment confirmation failed.' });
+                    setMessage({ type: 'error', text: 'Erreur de confirmation du paiement.' });
                 }
             }
         } catch (error) {
             console.error('Purchase failed:', error);
-            setMessage({ type: 'error', text: 'An error occurred. Please try again.' });
+            setMessage({ type: 'error', text: 'Une erreur est survenue. Veuillez réessayer.' });
         } finally {
             setLoading(false);
             setSelectedPackage(null);
@@ -143,23 +154,40 @@ export default function CreditsIndex({ balance, transactions, packages, stripeKe
     return (
         <AuthenticatedLayout
             header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                    Credits
-                </h2>
+                <div className="flex items-center gap-4">
+                    <Link href={route('dashboard')}>
+                        <Button variant="ghost" size="sm">
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                    </Link>
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                            <Wallet className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-semibold leading-tight text-gray-800">
+                                Mes Crédits
+                            </h2>
+                            <p className="text-sm text-muted-foreground">
+                                Gérez votre solde et vos achats
+                            </p>
+                        </div>
+                    </div>
+                </div>
             }
         >
-            <Head title="Credits" />
+            <Head title="Crédits" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-5xl sm:px-6 lg:px-8">
+            <div className="py-8">
+                <div className="mx-auto max-w-4xl sm:px-6 lg:px-8 space-y-6">
                     {/* Flash Messages */}
                     {message && (
                         <Alert 
-                            className={`mb-6 ${
+                            className={
                                 message.type === 'success' ? 'border-green-500 bg-green-50' :
                                 message.type === 'error' ? 'border-red-500 bg-red-50' :
                                 'border-blue-500 bg-blue-50'
-                            }`}
+                            }
                         >
                             {message.type === 'success' ? (
                                 <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -178,44 +206,47 @@ export default function CreditsIndex({ balance, transactions, packages, stripeKe
 
                     {/* Mock Mode Notice */}
                     {mockMode && (
-                        <Alert className="mb-6 border-yellow-500 bg-yellow-50">
+                        <Alert className="border-yellow-500 bg-yellow-50">
                             <AlertCircle className="h-4 w-4 text-yellow-600" />
                             <AlertDescription className="text-yellow-700">
-                                <strong>Development Mode:</strong> Payments are simulated. Credits will be added instantly without real charges.
+                                <strong>Mode développement :</strong> Les paiements sont simulés. Les crédits seront ajoutés instantanément sans frais réels.
                             </AlertDescription>
                         </Alert>
                     )}
 
                     {/* Balance Card */}
-                    <Card className="mb-8">
+                    <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <CardTitle>Credit Balance</CardTitle>
+                                    <CardTitle>Solde actuel</CardTitle>
                                     <CardDescription>
-                                        Use credits to pay for server usage
+                                        Utilisez vos crédits pour vos assistants IA
                                     </CardDescription>
                                 </div>
-                                <Wallet className="h-8 w-8 text-muted-foreground" />
+                                <Wallet className="h-10 w-10 text-primary" />
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-4xl font-bold">
+                            <div className="text-5xl font-bold text-primary">
                                 €{Number(balance).toFixed(2)}
                             </div>
                         </CardContent>
                     </Card>
 
                     {/* Purchase Credits */}
-                    <Card className="mb-8">
+                    <Card>
                         <CardHeader>
-                            <CardTitle>Add Credits</CardTitle>
+                            <CardTitle className="flex items-center gap-2">
+                                <CreditCard className="h-5 w-5" />
+                                Recharger mes crédits
+                            </CardTitle>
                             <CardDescription>
-                                Choose a package or enter a custom amount
+                                Choisissez un montant ou entrez un montant personnalisé
                             </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                        <CardContent className="space-y-6">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                 {packages.map((pkg) => (
                                     <button
                                         key={pkg.amount}
@@ -223,25 +254,25 @@ export default function CreditsIndex({ balance, transactions, packages, stripeKe
                                             setSelectedPackage(pkg.amount);
                                             setCustomAmount('');
                                         }}
-                                        className={`relative p-4 rounded-lg border-2 transition-colors ${
+                                        className={`relative p-4 rounded-xl border-2 transition-all ${
                                             selectedPackage === pkg.amount
-                                                ? 'border-primary bg-primary/5'
+                                                ? 'border-primary bg-primary/5 shadow-sm'
                                                 : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                     >
-                                        <div className="text-lg font-bold">{pkg.label}</div>
+                                        <div className="text-xl font-bold">{pkg.label}</div>
                                         {pkg.bonus > 0 && (
-                                            <Badge className="absolute -top-2 -right-2 text-xs">
-                                                +€{pkg.bonus} bonus
+                                            <Badge className="absolute -top-2 -right-2 text-xs bg-green-500">
+                                                +{pkg.bonus}€
                                             </Badge>
                                         )}
                                     </button>
                                 ))}
                             </div>
 
-                            <div className="flex items-center gap-4 mb-6">
+                            <div className="flex items-center gap-4">
                                 <div className="flex-1">
-                                    <label className="text-sm text-muted-foreground">Custom amount (€)</label>
+                                    <label className="text-sm text-muted-foreground">Montant personnalisé (€)</label>
                                     <input
                                         type="number"
                                         min="5"
@@ -252,8 +283,8 @@ export default function CreditsIndex({ balance, transactions, packages, stripeKe
                                             setCustomAmount(e.target.value);
                                             setSelectedPackage(null);
                                         }}
-                                        placeholder="Enter amount (min €5)"
-                                        className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                                        placeholder="Minimum 5€"
+                                        className="w-full mt-1 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                                     />
                                 </div>
                             </div>
@@ -264,14 +295,14 @@ export default function CreditsIndex({ balance, transactions, packages, stripeKe
                                 className="w-full"
                                 size="lg"
                             >
-                                <CreditCard className="mr-2 h-4 w-4" />
-                                {loading ? 'Processing...' : `Purchase €${purchaseAmount.toFixed(2)}`}
+                                <CreditCard className="mr-2 h-5 w-5" />
+                                {loading ? 'Traitement...' : `Acheter ${purchaseAmount.toFixed(2)}€ de crédits`}
                             </Button>
 
-                            <p className="text-xs text-muted-foreground mt-4 text-center">
+                            <p className="text-sm text-muted-foreground text-center">
                                 {mockMode 
-                                    ? 'Development mode: Credits will be added instantly.'
-                                    : 'Payments are processed securely via Stripe. Credits never expire.'
+                                    ? 'Mode développement : les crédits seront ajoutés instantanément.'
+                                    : 'Paiement sécurisé par Stripe. Les crédits n\'expirent jamais.'
                                 }
                             </p>
                         </CardContent>
@@ -280,15 +311,17 @@ export default function CreditsIndex({ balance, transactions, packages, stripeKe
                     {/* Transaction History */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Transaction History</CardTitle>
+                            <CardTitle>Historique des transactions</CardTitle>
                             <CardDescription>
-                                Your credit activity
+                                Vos mouvements de crédits
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             {transactions.length === 0 ? (
-                                <div className="text-center py-8 text-muted-foreground">
-                                    No transactions yet
+                                <div className="text-center py-12 text-muted-foreground">
+                                    <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                    <p>Aucune transaction pour le moment</p>
+                                    <p className="text-sm">Achetez des crédits pour commencer</p>
                                 </div>
                             ) : (
                                 <Table>
@@ -297,8 +330,8 @@ export default function CreditsIndex({ balance, transactions, packages, stripeKe
                                             <TableHead>Type</TableHead>
                                             <TableHead>Description</TableHead>
                                             <TableHead>Date</TableHead>
-                                            <TableHead className="text-right">Amount</TableHead>
-                                            <TableHead className="text-right">Balance</TableHead>
+                                            <TableHead className="text-right">Montant</TableHead>
+                                            <TableHead className="text-right">Solde</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -307,19 +340,22 @@ export default function CreditsIndex({ balance, transactions, packages, stripeKe
                                                 <TableCell>
                                                     <div className="flex items-center gap-2">
                                                         {typeIcons[tx.type]}
-                                                        <span className="capitalize">{tx.type}</span>
+                                                        <span>{typeLabels[tx.type] || tx.type}</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     {tx.description || '-'}
                                                     {tx.server && (
-                                                        <span className="text-muted-foreground ml-1">
+                                                        <Link 
+                                                            href={route('assistants.show', tx.server.id)}
+                                                            className="text-primary hover:underline ml-1"
+                                                        >
                                                             ({tx.server.name})
-                                                        </span>
+                                                        </Link>
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-muted-foreground">
-                                                    {new Date(tx.created_at).toLocaleDateString()}
+                                                    {new Date(tx.created_at).toLocaleDateString('fr-FR')}
                                                 </TableCell>
                                                 <TableCell className={`text-right font-medium ${
                                                     Number(tx.amount) >= 0 ? 'text-green-600' : 'text-red-600'

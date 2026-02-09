@@ -3,12 +3,13 @@ import NavLink from '@/Components/NavLink';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
 import { Link, usePage } from '@inertiajs/react';
 import { PropsWithChildren, ReactNode, useState } from 'react';
-import { Cloud, Shield } from 'lucide-react';
+import { Cloud, Shield, Bot, Wallet, Settings } from 'lucide-react';
 
 interface User {
     name: string;
     email: string;
     is_admin?: boolean;
+    billing_mode?: 'credits' | 'byok';
 }
 
 export default function Authenticated({
@@ -38,20 +39,26 @@ export default function Authenticated({
                                     href={route('dashboard')}
                                     active={route().current('dashboard')}
                                 >
-                                    Dashboard
+                                    Accueil
                                 </NavLink>
                                 <NavLink
-                                    href={route('servers.index')}
-                                    active={route().current('servers.*')}
+                                    href={route('assistants.index')}
+                                    active={route().current('assistants.*')}
+                                    className="flex items-center gap-1"
                                 >
-                                    Servers
+                                    <Bot className="h-4 w-4" />
+                                    Mes Assistants
                                 </NavLink>
-                                <NavLink
-                                    href={route('credits.index')}
-                                    active={route().current('credits.*')}
-                                >
-                                    Credits
-                                </NavLink>
+                                {user.billing_mode === 'credits' && (
+                                    <NavLink
+                                        href={route('credits.index')}
+                                        active={route().current('credits.*')}
+                                        className="flex items-center gap-1"
+                                    >
+                                        <Wallet className="h-4 w-4" />
+                                        Crédits
+                                    </NavLink>
+                                )}
                                 {user.is_admin && (
                                     <NavLink
                                         href={route('admin.dashboard')}
@@ -96,17 +103,19 @@ export default function Authenticated({
                                     </Dropdown.Trigger>
 
                                     <Dropdown.Content>
-                                        <Dropdown.Link
-                                            href={route('profile.edit')}
-                                        >
-                                            Profile
+                                        <Dropdown.Link href={route('settings.index')}>
+                                            <Settings className="inline h-4 w-4 mr-2" />
+                                            Paramètres
+                                        </Dropdown.Link>
+                                        <Dropdown.Link href={route('profile.edit')}>
+                                            Mon profil
                                         </Dropdown.Link>
                                         <Dropdown.Link
                                             href={route('logout')}
                                             method="post"
                                             as="button"
                                         >
-                                            Log Out
+                                            Déconnexion
                                         </Dropdown.Link>
                                     </Dropdown.Content>
                                 </Dropdown>
@@ -167,19 +176,27 @@ export default function Authenticated({
                             href={route('dashboard')}
                             active={route().current('dashboard')}
                         >
-                            Dashboard
+                            Accueil
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
-                            href={route('servers.index')}
-                            active={route().current('servers.*')}
+                            href={route('assistants.index')}
+                            active={route().current('assistants.*')}
                         >
-                            Servers
+                            Mes Assistants
                         </ResponsiveNavLink>
+                        {user.billing_mode === 'credits' && (
+                            <ResponsiveNavLink
+                                href={route('credits.index')}
+                                active={route().current('credits.*')}
+                            >
+                                Crédits
+                            </ResponsiveNavLink>
+                        )}
                         <ResponsiveNavLink
-                            href={route('credits.index')}
-                            active={route().current('credits.*')}
+                            href={route('settings.index')}
+                            active={route().current('settings.*')}
                         >
-                            Credits
+                            Paramètres
                         </ResponsiveNavLink>
                         {user.is_admin && (
                             <ResponsiveNavLink
@@ -203,14 +220,14 @@ export default function Authenticated({
 
                         <div className="mt-3 space-y-1">
                             <ResponsiveNavLink href={route('profile.edit')}>
-                                Profile
+                                Mon profil
                             </ResponsiveNavLink>
                             <ResponsiveNavLink
                                 method="post"
                                 href={route('logout')}
                                 as="button"
                             >
-                                Log Out
+                                Déconnexion
                             </ResponsiveNavLink>
                         </div>
                     </div>

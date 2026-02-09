@@ -12,9 +12,17 @@ class HetznerService
     protected string $apiToken;
     protected string $baseUrl = 'https://api.hetzner.cloud/v1';
 
-    public function __construct()
+    public function __construct(?string $customToken = null)
     {
-        $this->apiToken = config('services.hetzner.token', '');
+        $this->apiToken = $customToken ?? config('services.hetzner.token', '');
+    }
+
+    /**
+     * Create a new instance with a custom token (for BYOK users)
+     */
+    public static function withToken(string $token): self
+    {
+        return new self($token);
     }
 
     protected function request(): \Illuminate\Http\Client\PendingRequest
@@ -31,6 +39,23 @@ class HetznerService
     protected function isMockMode(): bool
     {
         return config('services.hetzner.mock', false) || empty($this->apiToken);
+    }
+
+    /**
+     * Validate a Hetzner API token
+     */
+    public function validateToken(): bool
+    {
+        if ($this->isMockMode()) {
+            return true;
+        }
+
+        try {
+            $response = $this->request()->get('/locations');
+            return $response->successful();
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**

@@ -19,21 +19,45 @@ class ProvisioningService
     }
 
     /**
+     * Get the appropriate HetznerService for a user (platform or BYOK)
+     */
+    protected function getHetznerService(User $user): HetznerService
+    {
+        if ($user->isByokMode() && $user->hetzner_token) {
+            return HetznerService::withToken($user->hetzner_token);
+        }
+        return $this->hetzner;
+    }
+
+    /**
      * Create and provision a new server for a user
      */
     public function createServer(User $user, string $name, string $serverType = 'cx22', string $datacenter = 'fsn1'): Server
     {
-        // Check credits
-        $hourlyRate = $this->getHourlyRate($serverType);
-        $minimumCredits = $hourlyRate * 24; // At least 24h worth of credits
+        $billingMode = $user->billing_mode;
 
-        if (!$this->credits->hasEnoughCredits($user, $minimumCredits)) {
-            throw new \Exception('Insufficient credits. Please add at least €' . number_format($minimumCredits, 2) . ' to your account.');
+        // Check requirements based on billing mode
+        if ($billingMode === 'credits') {
+            $monthlyRate = $this->getMonthlyRate($serverType);
+            $minimumCredits = $monthlyRate; // At least 1 month worth of credits
+
+            if (!$this->credits->hasEnoughCredits($user, $minimumCredits)) {
+                throw new \Exception('Crédits insuffisants. Veuillez ajouter au moins €' . number_format($minimumCredits, 2) . ' à votre compte.');
+            }
+        } else {
+            // BYOK mode - check if user has configured their token
+            if (!$user->hasByokConfigured()) {
+                throw new \Exception('Veuillez configurer votre token Hetzner dans les paramètres avant de créer un assistant.');
+            }
         }
+
+        // Get the right Hetzner service
+        $hetznerService = $this->getHetznerService($user);
 
         // Create server record
         $server = Server::create([
             'user_id' => $user->id,
+            'billing_mode' => $billingMode,
             'name' => $name,
             'server_type' => $serverType,
             'datacenter' => $datacenter,
@@ -43,7 +67,7 @@ class ProvisioningService
 
         try {
             // Create server on Hetzner
-            $result = $this->hetzner->createServer($server);
+            $result = $hetznerService->createServer($server);
 
             // Update server with Hetzner details
             $hetznerServer = $result['server'];
@@ -62,27 +86,31 @@ class ProvisioningService
                 ],
             ]);
 
-            $server->appendProvisionLog('Server created on Hetzner');
-            $server->appendProvisionLog('IP: ' . ($server->ip ?? 'pending'));
+            $server->appendProvisionLog('Assistant créé sur Hetzner');
+            $server->appendProvisionLog('IP: ' . ($server->ip ?? 'en attente'));
 
-            // Deduct initial credit for server creation
-            $this->credits->deductCredits($user, $hourlyRate, 'Server creation: ' . $name, $server->id);
+            // Deduct credits only in credits mode
+            if ($billingMode === 'credits') {
+                $monthlyRate = $this->getMonthlyRate($serverType);
+                $this->credits->deductCredits($user, $monthlyRate, 'Création assistant: ' . $name, $server->id);
+            }
 
             // Dispatch provisioning job
             if ($rootPassword) {
                 ProvisionServerJob::dispatch($server, $rootPassword)
                     ->delay(now()->addSeconds(30)); // Wait 30 seconds for server to boot
                 
-                $server->appendProvisionLog('Provisioning job scheduled');
+                $server->appendProvisionLog('Configuration automatique programmée');
             } else {
                 // If no root password (SSH key used), provision differently
-                $server->appendProvisionLog('Warning: No root password available, manual provisioning required');
+                $server->appendProvisionLog('Attention: Pas de mot de passe root, configuration manuelle requise');
             }
 
             Log::info('Server creation initiated', [
                 'server_id' => $server->id,
                 'hetzner_id' => $server->hetzner_id,
                 'user_id' => $user->id,
+                'billing_mode' => $billingMode,
             ]);
 
             return $server->fresh();
@@ -92,7 +120,7 @@ class ProvisioningService
                 'status' => 'error',
                 'provision_status' => 'failed',
             ]);
-            $server->appendProvisionLog('ERROR: ' . $e->getMessage());
+            $server->appendProvisionLog('ERREUR: ' . $e->getMessage());
 
             Log::error('Server provisioning failed', [
                 'server_id' => $server->id,
@@ -108,8 +136,13 @@ class ProvisioningService
     public function deleteServer(Server $server): bool
     {
         try {
+            // Get the right Hetzner service based on server's billing mode
+            $hetznerService = $server->isByok() && $server->user->hetzner_token
+                ? HetznerService::withToken($server->user->hetzner_token)
+                : $this->hetzner;
+
             if ($server->hetzner_id) {
-                $this->hetzner->deleteServer($server->hetzner_id);
+                $hetznerService->deleteServer($server->hetzner_id);
             }
 
             // Delete email account if exists
@@ -142,18 +175,19 @@ class ProvisioningService
     }
 
     /**
-     * Get the hourly rate for a server type (in EUR)
+     * Get the monthly rate for a server type (in EUR)
+     * Used for credits billing
      */
-    public function getHourlyRate(string $serverType): float
+    public function getMonthlyRate(string $serverType): float
     {
         $rates = [
-            'cx22' => 0.0065,
-            'cx32' => 0.013,
-            'cx42' => 0.026,
-            'cx52' => 0.052,
+            'cx22' => 4.99,
+            'cx32' => 9.99,
+            'cx42' => 19.99,
+            'cx52' => 39.99,
         ];
 
-        return $rates[$serverType] ?? 0.0065;
+        return $rates[$serverType] ?? 4.99;
     }
 
     /**
@@ -164,71 +198,64 @@ class ProvisioningService
         return [
             [
                 'name' => 'cx22',
-                'label' => 'Starter',
-                'description' => '2 vCPU, 4GB RAM, 40GB SSD',
-                'hourly_rate' => 0.0065,
-                'monthly_estimate' => 4.68,
+                'label' => 'Essentiel',
+                'description' => '2 cœurs, 4Go RAM, 40Go stockage',
+                'monthly_rate' => 4.99,
+                'hetzner_cost' => 3.29,
             ],
             [
                 'name' => 'cx32',
-                'label' => 'Standard',
-                'description' => '4 vCPU, 8GB RAM, 80GB SSD',
-                'hourly_rate' => 0.013,
-                'monthly_estimate' => 9.36,
+                'label' => 'Confort',
+                'description' => '4 cœurs, 8Go RAM, 80Go stockage',
+                'monthly_rate' => 9.99,
+                'hetzner_cost' => 6.59,
             ],
             [
                 'name' => 'cx42',
                 'label' => 'Performance',
-                'description' => '8 vCPU, 16GB RAM, 160GB SSD',
-                'hourly_rate' => 0.026,
-                'monthly_estimate' => 18.72,
+                'description' => '8 cœurs, 16Go RAM, 160Go stockage',
+                'monthly_rate' => 19.99,
+                'hetzner_cost' => 13.19,
             ],
         ];
     }
 
     /**
-     * Check and charge hourly server costs
-     * Should be called by a scheduler every hour
+     * Power on a server
      */
-    public function chargeHourlyServerCosts(): array
+    public function powerOn(Server $server): bool
     {
-        $results = [];
-
-        $servers = Server::where('status', 'running')
-            ->whereNotNull('hetzner_id')
-            ->get();
-
-        foreach ($servers as $server) {
-            try {
-                $rate = $this->getHourlyRate($server->server_type);
-                $user = $server->user;
-
-                if ($this->credits->hasEnoughCredits($user, $rate)) {
-                    $this->credits->deductCredits(
-                        $user,
-                        $rate,
-                        'Hourly charge: ' . $server->name,
-                        $server->id
-                    );
-                    $results[$server->id] = 'charged';
-                } else {
-                    // Insufficient credits - stop the server
-                    $this->hetzner->powerOff($server->hetzner_id);
-                    $server->update(['status' => 'stopped']);
-                    $server->appendProvisionLog('Server stopped: Insufficient credits');
-                    $results[$server->id] = 'stopped_insufficient_credits';
-
-                    // TODO: Send notification to user
-                }
-            } catch (\Exception $e) {
-                Log::error('Error charging server', [
-                    'server_id' => $server->id,
-                    'error' => $e->getMessage(),
-                ]);
-                $results[$server->id] = 'error';
-            }
+        $hetznerService = $this->getHetznerServiceForServer($server);
+        
+        if ($server->hetzner_id) {
+            return $hetznerService->powerOn($server->hetzner_id);
         }
+        
+        return false;
+    }
 
-        return $results;
+    /**
+     * Power off a server
+     */
+    public function powerOff(Server $server): bool
+    {
+        $hetznerService = $this->getHetznerServiceForServer($server);
+        
+        if ($server->hetzner_id) {
+            return $hetznerService->powerOff($server->hetzner_id);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Get the appropriate HetznerService for a server
+     */
+    protected function getHetznerServiceForServer(Server $server): HetznerService
+    {
+        if ($server->isByok() && $server->user->hetzner_token) {
+            return HetznerService::withToken($server->user->hetzner_token);
+        }
+        return $this->hetzner;
     }
 }
