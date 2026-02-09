@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm, usePage, Link } from '@inertiajs/react';
+import { Head, useForm, usePage, Link, router } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,8 +83,7 @@ export default function SettingsIndex({ llmBillingMode, hasAnthropicKey, hasOpen
 
     const handleRemoveKey = (provider: 'anthropic' | 'openai') => {
         if (confirm(`Voulez-vous vraiment supprimer votre clé API ${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} ?`)) {
-            const form = useForm({ provider });
-            form.delete(route('settings.api-key.delete'), {
+            router.delete(route('settings.api-key.delete'), {
                 preserveScroll: true,
                 data: { provider },
             });

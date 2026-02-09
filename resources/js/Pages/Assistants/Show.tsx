@@ -18,9 +18,9 @@ interface Assistant {
     ip: string | null;
     status: string;
     server_type: string;
+    monthly_price: number;
     datacenter: string;
     image: string;
-    billing_mode: string;
     specs: {
         cores?: number;
         memory?: number;
@@ -349,15 +349,13 @@ export default function ShowAssistant({ assistant }: Props) {
                                             <Badge className={`${status.bgColor} ${status.color}`}>{status.label}</Badge>
                                         </div>
                                         <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Abonnement</span>
+                                            <span className="font-medium">€{Number(assistant.monthly_price).toFixed(2)}/mois</span>
+                                        </div>
+                                        <div className="flex justify-between">
                                             <span className="text-muted-foreground">Créé le</span>
                                             <span>{new Date(assistant.created_at).toLocaleDateString('fr-FR')}</span>
                                         </div>
-                                        {assistant.billing_mode === 'byok' && (
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Facturation</span>
-                                                <Badge variant="outline">Votre compte Hetzner</Badge>
-                                            </div>
-                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
