@@ -3,6 +3,13 @@ export interface User {
     name: string;
     email: string;
     email_verified_at?: string;
+    is_admin?: boolean;
+}
+
+export interface Flash {
+    success?: string;
+    error?: string;
+    info?: string;
 }
 
 export type PageProps<
@@ -11,4 +18,5 @@ export type PageProps<
     auth: {
         user: User;
     };
+    flash?: Flash;
 };

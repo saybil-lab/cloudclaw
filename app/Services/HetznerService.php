@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Server;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class HetznerService
 {
@@ -20,42 +21,66 @@ class HetznerService
     {
         return Http::withToken($this->apiToken)
             ->baseUrl($this->baseUrl)
-            ->acceptJson();
+            ->acceptJson()
+            ->timeout(60);
+    }
+
+    /**
+     * Check if we're in mock mode
+     */
+    protected function isMockMode(): bool
+    {
+        return config('services.hetzner.mock', false) || empty($this->apiToken);
     }
 
     /**
      * Create a new server on Hetzner
      */
-    public function createServer(Server $server, string $sshKeyName = null): array
+    public function createServer(Server $server, ?string $sshKeyName = null): array
     {
+        if ($this->isMockMode()) {
+            return $this->mockCreateServer($server);
+        }
+
         $payload = [
-            'name' => $server->name,
+            'name' => Str::slug($server->name) . '-' . $server->id,
             'server_type' => $server->server_type,
             'location' => $server->datacenter,
             'image' => $server->image,
             'start_after_create' => true,
+            'labels' => [
+                'cloudclaw' => 'true',
+                'user_id' => (string) $server->user_id,
+                'server_id' => (string) $server->id,
+            ],
         ];
 
+        // Add SSH keys if specified
         if ($sshKeyName) {
             $payload['ssh_keys'] = [$sshKeyName];
         }
 
-        // In development/mock mode, return fake data
-        if (config('services.hetzner.mock', true)) {
-            return $this->mockCreateServer($server);
-        }
+        // Use cloud-init for initial setup
+        $payload['user_data'] = $this->getCloudInitScript();
 
         $response = $this->request()->post('/servers', $payload);
 
         if ($response->failed()) {
-            Log::error('Hetzner API error', [
+            Log::error('Hetzner API error creating server', [
                 'status' => $response->status(),
                 'body' => $response->json(),
+                'server_id' => $server->id,
             ]);
-            throw new \Exception('Failed to create server: ' . $response->json('error.message', 'Unknown error'));
+            throw new \Exception('Failed to create server: ' . ($response->json('error.message') ?? 'Unknown error'));
         }
 
-        return $response->json();
+        $data = $response->json();
+        Log::info('Hetzner server created', [
+            'hetzner_id' => $data['server']['id'] ?? null,
+            'server_id' => $server->id,
+        ]);
+
+        return $data;
     }
 
     /**
@@ -63,13 +88,17 @@ class HetznerService
      */
     public function getServer(string $hetznerId): ?array
     {
-        if (config('services.hetzner.mock', true)) {
+        if ($this->isMockMode()) {
             return $this->mockGetServer($hetznerId);
         }
 
         $response = $this->request()->get("/servers/{$hetznerId}");
 
         if ($response->failed()) {
+            Log::warning('Hetzner API error getting server', [
+                'status' => $response->status(),
+                'hetzner_id' => $hetznerId,
+            ]);
             return null;
         }
 
@@ -81,13 +110,23 @@ class HetznerService
      */
     public function deleteServer(string $hetznerId): bool
     {
-        if (config('services.hetzner.mock', true)) {
+        if ($this->isMockMode()) {
             return true;
         }
 
         $response = $this->request()->delete("/servers/{$hetznerId}");
 
-        return $response->successful();
+        if ($response->failed()) {
+            Log::error('Hetzner API error deleting server', [
+                'status' => $response->status(),
+                'body' => $response->json(),
+                'hetzner_id' => $hetznerId,
+            ]);
+            return false;
+        }
+
+        Log::info('Hetzner server deleted', ['hetzner_id' => $hetznerId]);
+        return true;
     }
 
     /**
@@ -95,13 +134,21 @@ class HetznerService
      */
     public function powerOn(string $hetznerId): bool
     {
-        if (config('services.hetzner.mock', true)) {
+        if ($this->isMockMode()) {
             return true;
         }
 
         $response = $this->request()->post("/servers/{$hetznerId}/actions/poweron");
 
-        return $response->successful();
+        if ($response->failed()) {
+            Log::error('Hetzner API error powering on server', [
+                'status' => $response->status(),
+                'hetzner_id' => $hetznerId,
+            ]);
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -109,22 +156,47 @@ class HetznerService
      */
     public function powerOff(string $hetznerId): bool
     {
-        if (config('services.hetzner.mock', true)) {
+        if ($this->isMockMode()) {
             return true;
         }
 
         $response = $this->request()->post("/servers/{$hetznerId}/actions/poweroff");
 
+        if ($response->failed()) {
+            Log::error('Hetzner API error powering off server', [
+                'status' => $response->status(),
+                'hetzner_id' => $hetznerId,
+            ]);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Reboot a server
+     */
+    public function reboot(string $hetznerId): bool
+    {
+        if ($this->isMockMode()) {
+            return true;
+        }
+
+        $response = $this->request()->post("/servers/{$hetznerId}/actions/reboot");
+
         return $response->successful();
     }
 
     /**
-     * Get VNC console URL
+     * Get VNC console URL (Hetzner's built-in console)
      */
-    public function getConsole(string $hetznerId): ?string
+    public function getConsole(string $hetznerId): ?array
     {
-        if (config('services.hetzner.mock', true)) {
-            return "https://console.hetzner.cloud/servers/{$hetznerId}/vnc";
+        if ($this->isMockMode()) {
+            return [
+                'wss_url' => "wss://console.hetzner.cloud/servers/{$hetznerId}/vnc",
+                'password' => 'mock-password',
+            ];
         }
 
         $response = $this->request()->post("/servers/{$hetznerId}/actions/request_console");
@@ -133,7 +205,34 @@ class HetznerService
             return null;
         }
 
-        return $response->json('action.root_password') ?? $response->json('wss_url');
+        return [
+            'wss_url' => $response->json('action.wss_url'),
+            'password' => $response->json('action.password'),
+        ];
+    }
+
+    /**
+     * List all servers (optionally filtered by labels)
+     */
+    public function listServers(array $labels = []): array
+    {
+        if ($this->isMockMode()) {
+            return [];
+        }
+
+        $params = [];
+        if (!empty($labels)) {
+            $labelSelector = implode(',', array_map(fn($k, $v) => "{$k}={$v}", array_keys($labels), $labels));
+            $params['label_selector'] = $labelSelector;
+        }
+
+        $response = $this->request()->get('/servers', $params);
+
+        if ($response->failed()) {
+            return [];
+        }
+
+        return $response->json('servers', []);
     }
 
     /**
@@ -141,23 +240,119 @@ class HetznerService
      */
     public function getServerTypes(): array
     {
-        if (config('services.hetzner.mock', true)) {
-            return [
-                ['name' => 'cx22', 'description' => '2 vCPU, 4GB RAM, 40GB SSD', 'prices' => ['hourly' => 0.0065]],
-                ['name' => 'cx32', 'description' => '4 vCPU, 8GB RAM, 80GB SSD', 'prices' => ['hourly' => 0.013]],
-                ['name' => 'cx42', 'description' => '8 vCPU, 16GB RAM, 160GB SSD', 'prices' => ['hourly' => 0.026]],
-            ];
+        if ($this->isMockMode()) {
+            return $this->getMockServerTypes();
         }
 
         $response = $this->request()->get('/server_types');
 
+        if ($response->failed()) {
+            return $this->getMockServerTypes();
+        }
+
         return $response->json('server_types', []);
+    }
+
+    /**
+     * List available locations
+     */
+    public function getLocations(): array
+    {
+        if ($this->isMockMode()) {
+            return $this->getMockLocations();
+        }
+
+        $response = $this->request()->get('/locations');
+
+        if ($response->failed()) {
+            return $this->getMockLocations();
+        }
+
+        return $response->json('locations', []);
+    }
+
+    /**
+     * List available images
+     */
+    public function getImages(string $type = 'system'): array
+    {
+        if ($this->isMockMode()) {
+            return [];
+        }
+
+        $response = $this->request()->get('/images', ['type' => $type]);
+
+        if ($response->failed()) {
+            return [];
+        }
+
+        return $response->json('images', []);
+    }
+
+    /**
+     * Create or get SSH key
+     */
+    public function ensureSshKey(string $name, string $publicKey): ?array
+    {
+        if ($this->isMockMode()) {
+            return ['id' => 'mock-key-id', 'name' => $name];
+        }
+
+        // First check if key exists
+        $response = $this->request()->get('/ssh_keys', ['name' => $name]);
+        
+        if ($response->successful()) {
+            $keys = $response->json('ssh_keys', []);
+            if (!empty($keys)) {
+                return $keys[0];
+            }
+        }
+
+        // Create new key
+        $response = $this->request()->post('/ssh_keys', [
+            'name' => $name,
+            'public_key' => $publicKey,
+        ]);
+
+        if ($response->failed()) {
+            Log::error('Failed to create SSH key', ['name' => $name, 'error' => $response->json()]);
+            return null;
+        }
+
+        return $response->json('ssh_key');
+    }
+
+    /**
+     * Get cloud-init script for initial server setup
+     */
+    protected function getCloudInitScript(): string
+    {
+        return <<<'CLOUD_INIT'
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - curl
+  - git
+  - htop
+  - vim
+  - ufw
+
+runcmd:
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw allow 6080/tcp
+  - ufw allow 5901/tcp
+  - ufw --force enable
+  - echo "CloudClaw server initialized" > /var/log/cloudclaw-init.log
+CLOUD_INIT;
     }
 
     // Mock methods for development
     protected function mockCreateServer(Server $server): array
     {
-        $mockId = 'mock-' . uniqid();
+        $mockId = 'mock-' . time() . '-' . $server->id;
         return [
             'server' => [
                 'id' => $mockId,
@@ -166,17 +361,30 @@ class HetznerService
                     'ipv4' => [
                         'ip' => '10.0.0.' . rand(1, 255),
                     ],
+                    'ipv6' => [
+                        'ip' => '2001:db8::' . dechex(rand(1, 65535)),
+                    ],
                 ],
                 'status' => 'initializing',
                 'server_type' => [
                     'name' => $server->server_type,
-                    'description' => '2 vCPU, 4GB RAM, 40GB SSD',
-                    'cores' => 2,
-                    'memory' => 4,
-                    'disk' => 40,
+                    'description' => $this->getServerTypeDescription($server->server_type),
+                    'cores' => $this->getServerTypeCores($server->server_type),
+                    'memory' => $this->getServerTypeMemory($server->server_type),
+                    'disk' => $this->getServerTypeDisk($server->server_type),
                 ],
+                'datacenter' => [
+                    'name' => $server->datacenter,
+                    'location' => [
+                        'name' => $server->datacenter,
+                    ],
+                ],
+                'image' => [
+                    'name' => $server->image,
+                ],
+                'created' => now()->toIso8601String(),
             ],
-            'root_password' => 'mock-password-' . uniqid(),
+            'root_password' => 'mock-root-' . Str::random(16),
         ];
     }
 
@@ -196,5 +404,64 @@ class HetznerService
                 'disk' => 40,
             ],
         ];
+    }
+
+    protected function getMockServerTypes(): array
+    {
+        return [
+            ['name' => 'cx22', 'description' => '2 vCPU, 4GB RAM, 40GB SSD', 'cores' => 2, 'memory' => 4, 'disk' => 40, 'prices' => [['price_hourly' => ['gross' => '0.0065']]]],
+            ['name' => 'cx32', 'description' => '4 vCPU, 8GB RAM, 80GB SSD', 'cores' => 4, 'memory' => 8, 'disk' => 80, 'prices' => [['price_hourly' => ['gross' => '0.013']]]],
+            ['name' => 'cx42', 'description' => '8 vCPU, 16GB RAM, 160GB SSD', 'cores' => 8, 'memory' => 16, 'disk' => 160, 'prices' => [['price_hourly' => ['gross' => '0.026']]]],
+        ];
+    }
+
+    protected function getMockLocations(): array
+    {
+        return [
+            ['name' => 'fsn1', 'description' => 'Falkenstein, Germany', 'city' => 'Falkenstein', 'country' => 'DE'],
+            ['name' => 'nbg1', 'description' => 'Nuremberg, Germany', 'city' => 'Nuremberg', 'country' => 'DE'],
+            ['name' => 'hel1', 'description' => 'Helsinki, Finland', 'city' => 'Helsinki', 'country' => 'FI'],
+            ['name' => 'ash', 'description' => 'Ashburn, USA', 'city' => 'Ashburn', 'country' => 'US'],
+        ];
+    }
+
+    protected function getServerTypeDescription(string $type): string
+    {
+        return match($type) {
+            'cx22' => '2 vCPU, 4GB RAM, 40GB SSD',
+            'cx32' => '4 vCPU, 8GB RAM, 80GB SSD',
+            'cx42' => '8 vCPU, 16GB RAM, 160GB SSD',
+            default => 'Unknown type',
+        };
+    }
+
+    protected function getServerTypeCores(string $type): int
+    {
+        return match($type) {
+            'cx22' => 2,
+            'cx32' => 4,
+            'cx42' => 8,
+            default => 2,
+        };
+    }
+
+    protected function getServerTypeMemory(string $type): int
+    {
+        return match($type) {
+            'cx22' => 4,
+            'cx32' => 8,
+            'cx42' => 16,
+            default => 4,
+        };
+    }
+
+    protected function getServerTypeDisk(string $type): int
+    {
+        return match($type) {
+            'cx22' => 40,
+            'cx32' => 80,
+            'cx42' => 160,
+            default => 40,
+        };
     }
 }

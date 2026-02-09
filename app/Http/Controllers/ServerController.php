@@ -72,8 +72,13 @@ class ServerController extends Controller
             abort(403);
         }
 
+        // Make sensitive fields visible for the owner
+        $serverData = $server->toArray();
+        $serverData['vnc_password'] = $server->vnc_password;
+        $serverData['email_password'] = $server->email_password;
+
         return Inertia::render('Servers/Show', [
-            'server' => $server,
+            'server' => $serverData,
         ]);
     }
 

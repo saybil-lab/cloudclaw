@@ -43,7 +43,14 @@ return [
     'stripe' => [
         'key' => env('STRIPE_KEY'),
         'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
         'mock' => env('STRIPE_MOCK', true),
+    ],
+
+    'mailcow' => [
+        'url' => env('MAILCOW_API_URL'),
+        'api_key' => env('MAILCOW_API_KEY'),
+        'domain' => env('MAILCOW_DOMAIN', 'ai.cloudclaw.com'),
     ],
 
 ];

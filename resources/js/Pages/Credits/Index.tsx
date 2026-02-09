@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
     Table,
     TableBody,
@@ -11,8 +12,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { CreditCard, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
-import { useState } from 'react';
+import { CreditCard, TrendingUp, TrendingDown, Wallet, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface Transaction {
     id: number;
@@ -37,7 +38,11 @@ interface Props {
     balance: number;
     transactions: Transaction[];
     packages: CreditPackage[];
+    stripeKey?: string;
+    mockMode?: boolean;
 }
+
+import { Flash } from '@/types';
 
 const typeIcons: Record<string, React.ReactNode> = {
     purchase: <TrendingUp className="h-4 w-4 text-green-500" />,
@@ -46,15 +51,33 @@ const typeIcons: Record<string, React.ReactNode> = {
     bonus: <TrendingUp className="h-4 w-4 text-purple-500" />,
 };
 
-export default function CreditsIndex({ balance, transactions, packages }: Props) {
+export default function CreditsIndex({ balance, transactions, packages, stripeKey, mockMode }: Props) {
+    const { flash } = usePage().props as { flash?: Flash };
     const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [customAmount, setCustomAmount] = useState('');
+    const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+
+    useEffect(() => {
+        if (flash?.success) {
+            setMessage({ type: 'success', text: flash.success });
+        } else if (flash?.error) {
+            setMessage({ type: 'error', text: flash.error });
+        } else if (flash?.info) {
+            setMessage({ type: 'info', text: flash.info });
+        }
+    }, [flash]);
 
     const handlePurchase = async (amount: number) => {
+        if (!amount || amount < 5) {
+            setMessage({ type: 'error', text: 'Minimum purchase amount is €5' });
+            return;
+        }
+
         setLoading(true);
+        setMessage(null);
+
         try {
-            // In mock mode, this will just add credits directly
             const response = await fetch(route('credits.purchase'), {
                 method: 'POST',
                 headers: {
@@ -66,9 +89,26 @@ export default function CreditsIndex({ balance, transactions, packages }: Props)
 
             const data = await response.json();
 
+            if (data.error) {
+                setMessage({ type: 'error', text: data.error });
+                return;
+            }
+
+            // Mock mode - credits added directly
+            if (data.mock || data.success) {
+                setMessage({ type: 'success', text: `€${amount} credits added successfully!` });
+                router.reload();
+                return;
+            }
+
+            // Real Stripe Checkout - redirect to Stripe
+            if (data.url) {
+                window.location.href = data.url;
+                return;
+            }
+
+            // Legacy payment intent flow (fallback)
             if (data.clientSecret) {
-                // In a real implementation, you'd open Stripe checkout here
-                // For mock mode, we'll just confirm the payment
                 const confirmResponse = await fetch(route('credits.confirm'), {
                     method: 'POST',
                     headers: {
@@ -82,16 +122,23 @@ export default function CreditsIndex({ balance, transactions, packages }: Props)
                 });
 
                 if (confirmResponse.ok) {
+                    setMessage({ type: 'success', text: 'Payment successful! Credits added.' });
                     router.reload();
+                } else {
+                    setMessage({ type: 'error', text: 'Payment confirmation failed.' });
                 }
             }
         } catch (error) {
             console.error('Purchase failed:', error);
+            setMessage({ type: 'error', text: 'An error occurred. Please try again.' });
         } finally {
             setLoading(false);
             setSelectedPackage(null);
+            setCustomAmount('');
         }
     };
+
+    const purchaseAmount = selectedPackage || (customAmount ? parseFloat(customAmount) : 0);
 
     return (
         <AuthenticatedLayout
@@ -105,6 +152,40 @@ export default function CreditsIndex({ balance, transactions, packages }: Props)
 
             <div className="py-12">
                 <div className="mx-auto max-w-5xl sm:px-6 lg:px-8">
+                    {/* Flash Messages */}
+                    {message && (
+                        <Alert 
+                            className={`mb-6 ${
+                                message.type === 'success' ? 'border-green-500 bg-green-50' :
+                                message.type === 'error' ? 'border-red-500 bg-red-50' :
+                                'border-blue-500 bg-blue-50'
+                            }`}
+                        >
+                            {message.type === 'success' ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            ) : (
+                                <AlertCircle className="h-4 w-4 text-red-600" />
+                            )}
+                            <AlertDescription className={
+                                message.type === 'success' ? 'text-green-700' :
+                                message.type === 'error' ? 'text-red-700' :
+                                'text-blue-700'
+                            }>
+                                {message.text}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* Mock Mode Notice */}
+                    {mockMode && (
+                        <Alert className="mb-6 border-yellow-500 bg-yellow-50">
+                            <AlertCircle className="h-4 w-4 text-yellow-600" />
+                            <AlertDescription className="text-yellow-700">
+                                <strong>Development Mode:</strong> Payments are simulated. Credits will be added instantly without real charges.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     {/* Balance Card */}
                     <Card className="mb-8">
                         <CardHeader>
@@ -138,7 +219,10 @@ export default function CreditsIndex({ balance, transactions, packages }: Props)
                                 {packages.map((pkg) => (
                                     <button
                                         key={pkg.amount}
-                                        onClick={() => setSelectedPackage(pkg.amount)}
+                                        onClick={() => {
+                                            setSelectedPackage(pkg.amount);
+                                            setCustomAmount('');
+                                        }}
                                         className={`relative p-4 rounded-lg border-2 transition-colors ${
                                             selectedPackage === pkg.amount
                                                 ? 'border-primary bg-primary/5'
@@ -168,23 +252,27 @@ export default function CreditsIndex({ balance, transactions, packages }: Props)
                                             setCustomAmount(e.target.value);
                                             setSelectedPackage(null);
                                         }}
-                                        placeholder="Enter amount"
-                                        className="w-full mt-1 px-3 py-2 border rounded-md"
+                                        placeholder="Enter amount (min €5)"
+                                        className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                                     />
                                 </div>
                             </div>
 
                             <Button
-                                onClick={() => handlePurchase(selectedPackage || parseFloat(customAmount))}
-                                disabled={loading || (!selectedPackage && !customAmount)}
+                                onClick={() => handlePurchase(purchaseAmount)}
+                                disabled={loading || purchaseAmount < 5}
                                 className="w-full"
+                                size="lg"
                             >
                                 <CreditCard className="mr-2 h-4 w-4" />
-                                {loading ? 'Processing...' : `Purchase €${selectedPackage || customAmount || '0'}`}
+                                {loading ? 'Processing...' : `Purchase €${purchaseAmount.toFixed(2)}`}
                             </Button>
 
                             <p className="text-xs text-muted-foreground mt-4 text-center">
-                                Payments are processed securely via Stripe. Credits never expire.
+                                {mockMode 
+                                    ? 'Development mode: Credits will be added instantly.'
+                                    : 'Payments are processed securely via Stripe. Credits never expire.'
+                                }
                             </p>
                         </CardContent>
                     </Card>

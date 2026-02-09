@@ -6,6 +6,7 @@ use App\Models\Credit;
 use App\Models\CreditTransaction;
 use App\Models\User;
 use Stripe\StripeClient;
+use Illuminate\Support\Facades\Log;
 
 class CreditService
 {
@@ -14,9 +15,17 @@ class CreditService
     public function __construct()
     {
         $stripeKey = config('services.stripe.secret');
-        if ($stripeKey) {
+        if ($stripeKey && !config('services.stripe.mock', false)) {
             $this->stripe = new StripeClient($stripeKey);
         }
+    }
+
+    /**
+     * Check if Stripe is in mock mode
+     */
+    public function isMockMode(): bool
+    {
+        return config('services.stripe.mock', false) || !$this->stripe;
     }
 
     /**
@@ -77,11 +86,74 @@ class CreditService
     }
 
     /**
-     * Create a Stripe payment intent for credit purchase
+     * Create a Stripe Checkout Session for credit purchase
+     * This is the recommended way to handle payments with Stripe
+     */
+    public function createCheckoutSession(User $user, float $amount, string $successUrl, string $cancelUrl): array
+    {
+        if ($this->isMockMode()) {
+            // Mock response for development
+            return [
+                'id' => 'cs_mock_' . uniqid(),
+                'url' => $successUrl . '?mock=true&amount=' . $amount,
+                'mock' => true,
+            ];
+        }
+
+        // Ensure user has a Stripe customer
+        $customerId = $this->getOrCreateStripeCustomer($user);
+
+        try {
+            $session = $this->stripe->checkout->sessions->create([
+                'customer' => $customerId,
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => 'eur',
+                        'product_data' => [
+                            'name' => 'CloudClaw Credits',
+                            'description' => "€{$amount} in CloudClaw credits",
+                        ],
+                        'unit_amount' => (int) ($amount * 100), // Convert to cents
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode' => 'payment',
+                'success_url' => $successUrl . '?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => $cancelUrl,
+                'metadata' => [
+                    'user_id' => $user->id,
+                    'credit_amount' => $amount,
+                    'type' => 'credit_purchase',
+                ],
+            ]);
+
+            Log::info('Stripe Checkout session created', [
+                'session_id' => $session->id,
+                'user_id' => $user->id,
+                'amount' => $amount,
+            ]);
+
+            return [
+                'id' => $session->id,
+                'url' => $session->url,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Failed to create Stripe Checkout session', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Create a Stripe payment intent for credit purchase (legacy)
      */
     public function createPaymentIntent(User $user, float $amount): ?array
     {
-        if (!$this->stripe) {
+        if ($this->isMockMode()) {
             // Mock response for development
             return [
                 'client_secret' => 'pi_mock_' . uniqid() . '_secret_' . uniqid(),
@@ -114,8 +186,8 @@ class CreditService
      */
     public function confirmPayment(string $paymentIntentId): ?CreditTransaction
     {
-        if (!$this->stripe) {
-            // Mock: extract user from paymentIntentId isn't possible, skip
+        if ($this->isMockMode()) {
+            // Mock: can't process without real Stripe
             return null;
         }
 
@@ -147,6 +219,38 @@ class CreditService
     }
 
     /**
+     * Verify a checkout session and return details
+     */
+    public function verifyCheckoutSession(string $sessionId): ?array
+    {
+        if ($this->isMockMode()) {
+            return null;
+        }
+
+        try {
+            $session = $this->stripe->checkout->sessions->retrieve($sessionId);
+
+            if ($session->payment_status === 'paid') {
+                return [
+                    'user_id' => $session->metadata['user_id'] ?? null,
+                    'amount' => $session->metadata['credit_amount'] ?? ($session->amount_total / 100),
+                    'payment_intent' => $session->payment_intent,
+                    'status' => $session->payment_status,
+                ];
+            }
+
+            return null;
+
+        } catch (\Exception $e) {
+            Log::error('Failed to verify checkout session', [
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
      * Get or create Stripe customer for user
      */
     protected function getOrCreateStripeCustomer(User $user): string
@@ -155,7 +259,7 @@ class CreditService
             return $user->stripe_customer_id;
         }
 
-        if (!$this->stripe) {
+        if ($this->isMockMode()) {
             $customerId = 'cus_mock_' . uniqid();
             $user->update(['stripe_customer_id' => $customerId]);
             return $customerId;

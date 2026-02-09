@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\ProvisionServerJob;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
@@ -37,6 +38,7 @@ class ProvisioningService
             'server_type' => $serverType,
             'datacenter' => $datacenter,
             'status' => 'pending',
+            'provision_status' => 'pending',
         ]);
 
         try {
@@ -45,10 +47,14 @@ class ProvisioningService
 
             // Update server with Hetzner details
             $hetznerServer = $result['server'];
+            $rootPassword = $result['root_password'] ?? null;
+
             $server->update([
                 'hetzner_id' => $hetznerServer['id'],
                 'ip' => $hetznerServer['public_net']['ipv4']['ip'] ?? null,
                 'status' => 'provisioning',
+                'provision_status' => 'pending',
+                'root_password' => $rootPassword,
                 'specs' => [
                     'cores' => $hetznerServer['server_type']['cores'] ?? 2,
                     'memory' => $hetznerServer['server_type']['memory'] ?? 4,
@@ -56,15 +62,38 @@ class ProvisioningService
                 ],
             ]);
 
+            $server->appendProvisionLog('Server created on Hetzner');
+            $server->appendProvisionLog('IP: ' . ($server->ip ?? 'pending'));
+
             // Deduct initial credit for server creation
             $this->credits->deductCredits($user, $hourlyRate, 'Server creation: ' . $name, $server->id);
 
-            // Queue OpenClaw installation (in a real app, this would be a job)
-            $this->installOpenClaw($server);
+            // Dispatch provisioning job
+            if ($rootPassword) {
+                ProvisionServerJob::dispatch($server, $rootPassword)
+                    ->delay(now()->addSeconds(30)); // Wait 30 seconds for server to boot
+                
+                $server->appendProvisionLog('Provisioning job scheduled');
+            } else {
+                // If no root password (SSH key used), provision differently
+                $server->appendProvisionLog('Warning: No root password available, manual provisioning required');
+            }
+
+            Log::info('Server creation initiated', [
+                'server_id' => $server->id,
+                'hetzner_id' => $server->hetzner_id,
+                'user_id' => $user->id,
+            ]);
 
             return $server->fresh();
+
         } catch (\Exception $e) {
-            $server->update(['status' => 'error']);
+            $server->update([
+                'status' => 'error',
+                'provision_status' => 'failed',
+            ]);
+            $server->appendProvisionLog('ERROR: ' . $e->getMessage());
+
             Log::error('Server provisioning failed', [
                 'server_id' => $server->id,
                 'error' => $e->getMessage(),
@@ -74,44 +103,42 @@ class ProvisioningService
     }
 
     /**
-     * Install OpenClaw on the server
-     */
-    public function installOpenClaw(Server $server): void
-    {
-        // In production, this would SSH into the server and run installation commands
-        // For now, we'll simulate it
-        
-        if (config('services.hetzner.mock', true)) {
-            // Simulate installation delay
-            $server->update([
-                'status' => 'running',
-                'openclaw_installed' => true,
-                'provisioned_at' => now(),
-                'vnc_url' => "https://console.hetzner.cloud/servers/{$server->hetzner_id}/vnc",
-            ]);
-            return;
-        }
-
-        // Real installation would look something like:
-        // 1. Wait for server to be ready
-        // 2. SSH into server
-        // 3. Run OpenClaw installation script
-        // 4. Configure OpenClaw
-        // 5. Update server status
-    }
-
-    /**
      * Delete a server
      */
     public function deleteServer(Server $server): bool
     {
-        if ($server->hetzner_id) {
-            $this->hetzner->deleteServer($server->hetzner_id);
-        }
+        try {
+            if ($server->hetzner_id) {
+                $this->hetzner->deleteServer($server->hetzner_id);
+            }
 
-        $server->update(['status' => 'deleted']);
-        
-        return true;
+            // Delete email account if exists
+            if ($server->email_address) {
+                try {
+                    $mailService = app(MailService::class);
+                    $mailService->deleteMailbox($server->email_address);
+                } catch (\Exception $e) {
+                    Log::warning('Failed to delete mailbox', [
+                        'server_id' => $server->id,
+                        'email' => $server->email_address,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            $server->update(['status' => 'deleted']);
+
+            Log::info('Server deleted', ['server_id' => $server->id]);
+            
+            return true;
+
+        } catch (\Exception $e) {
+            Log::error('Failed to delete server', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
     }
 
     /**
@@ -157,5 +184,51 @@ class ProvisioningService
                 'monthly_estimate' => 18.72,
             ],
         ];
+    }
+
+    /**
+     * Check and charge hourly server costs
+     * Should be called by a scheduler every hour
+     */
+    public function chargeHourlyServerCosts(): array
+    {
+        $results = [];
+
+        $servers = Server::where('status', 'running')
+            ->whereNotNull('hetzner_id')
+            ->get();
+
+        foreach ($servers as $server) {
+            try {
+                $rate = $this->getHourlyRate($server->server_type);
+                $user = $server->user;
+
+                if ($this->credits->hasEnoughCredits($user, $rate)) {
+                    $this->credits->deductCredits(
+                        $user,
+                        $rate,
+                        'Hourly charge: ' . $server->name,
+                        $server->id
+                    );
+                    $results[$server->id] = 'charged';
+                } else {
+                    // Insufficient credits - stop the server
+                    $this->hetzner->powerOff($server->hetzner_id);
+                    $server->update(['status' => 'stopped']);
+                    $server->appendProvisionLog('Server stopped: Insufficient credits');
+                    $results[$server->id] = 'stopped_insufficient_credits';
+
+                    // TODO: Send notification to user
+                }
+            } catch (\Exception $e) {
+                Log::error('Error charging server', [
+                    'server_id' => $server->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $results[$server->id] = 'error';
+            }
+        }
+
+        return $results;
     }
 }

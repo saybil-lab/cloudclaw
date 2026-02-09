@@ -21,6 +21,12 @@ class Server extends Model
         'image',
         'specs',
         'vnc_url',
+        'vnc_password',
+        'email_address',
+        'email_password',
+        'provision_status',
+        'provision_log',
+        'root_password',
         'openclaw_installed',
         'provisioned_at',
     ];
@@ -29,6 +35,12 @@ class Server extends Model
         'specs' => 'array',
         'openclaw_installed' => 'boolean',
         'provisioned_at' => 'datetime',
+    ];
+
+    protected $hidden = [
+        'vnc_password',
+        'email_password',
+        'root_password',
     ];
 
     public function user(): BelongsTo
@@ -44,5 +56,26 @@ class Server extends Model
     public function isPending(): bool
     {
         return in_array($this->status, ['pending', 'provisioning']);
+    }
+
+    public function isReady(): bool
+    {
+        return $this->provision_status === 'ready' && $this->status === 'running';
+    }
+
+    public function appendProvisionLog(string $message): void
+    {
+        $timestamp = now()->format('Y-m-d H:i:s');
+        $log = $this->provision_log ?? '';
+        $log .= "[{$timestamp}] {$message}\n";
+        $this->update(['provision_log' => $log]);
+    }
+
+    public function getNoVncUrl(): ?string
+    {
+        if (!$this->ip || !$this->vnc_password) {
+            return null;
+        }
+        return "https://{$this->ip}:6080/vnc.html?password=" . urlencode($this->vnc_password);
     }
 }

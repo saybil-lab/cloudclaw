@@ -7,6 +7,7 @@ use App\Http\Controllers\CreditController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ServerController;
+use App\Http\Controllers\WebhookController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -32,6 +33,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Credits
     Route::get('/credits', [CreditController::class, 'index'])->name('credits.index');
     Route::post('/credits/purchase', [CreditController::class, 'purchase'])->name('credits.purchase');
+    Route::get('/credits/success', [CreditController::class, 'success'])->name('credits.success');
     Route::post('/credits/confirm', [CreditController::class, 'confirm'])->name('credits.confirm');
 
     // Profile
@@ -55,5 +57,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/users/{user}/credits', [AdminUserController::class, 'addCredits'])->name('users.credits');
     Route::post('/users/{user}/toggle-admin', [AdminUserController::class, 'toggleAdmin'])->name('users.toggle-admin');
 });
+
+// Webhook routes (no CSRF)
+Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe'])
+    ->name('webhooks.stripe')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 require __DIR__.'/auth.php';
