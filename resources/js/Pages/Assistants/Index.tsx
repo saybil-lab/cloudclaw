@@ -11,7 +11,7 @@ interface Assistant {
     ip: string | null;
     status: string;
     server_type: string;
-    billing_mode: string;
+    monthly_price: number;
     openclaw_installed: boolean;
     provision_status: string;
     created_at: string;
@@ -21,13 +21,12 @@ interface ServerType {
     name: string;
     label: string;
     description: string;
-    monthly_rate: number;
+    monthly_price: number;
 }
 
 interface Props {
     assistants: Assistant[];
     serverTypes: ServerType[];
-    billingMode: 'credits' | 'byok';
 }
 
 const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
@@ -43,7 +42,7 @@ const getServerTypeLabel = (serverTypes: ServerType[], name: string): string => 
     return type?.label || name;
 };
 
-export default function AssistantsIndex({ assistants, serverTypes, billingMode }: Props) {
+export default function AssistantsIndex({ assistants, serverTypes }: Props) {
     return (
         <AuthenticatedLayout
             header={
@@ -126,13 +125,18 @@ export default function AssistantsIndex({ assistants, serverTypes, billingMode }
                                         <CardContent>
                                             <div className="space-y-4">
                                                 {/* Status indicator */}
-                                                <div className="flex items-center gap-2 text-sm">
-                                                    <Power className={`h-4 w-4 ${assistant.status === 'running' ? 'text-green-500' : 'text-gray-400'}`} />
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <div className="flex items-center gap-2">
+                                                        <Power className={`h-4 w-4 ${assistant.status === 'running' ? 'text-green-500' : 'text-gray-400'}`} />
+                                                        <span className="text-muted-foreground">
+                                                            {assistant.status === 'running' ? 'En ligne' : 
+                                                             assistant.status === 'stopped' ? 'Hors ligne' :
+                                                             assistant.status === 'provisioning' ? 'Installation...' :
+                                                             'En attente'}
+                                                        </span>
+                                                    </div>
                                                     <span className="text-muted-foreground">
-                                                        {assistant.status === 'running' ? 'En ligne' : 
-                                                         assistant.status === 'stopped' ? 'Hors ligne' :
-                                                         assistant.status === 'provisioning' ? 'Installation...' :
-                                                         'En attente'}
+                                                        €{Number(assistant.monthly_price).toFixed(2)}/mois
                                                     </span>
                                                 </div>
 
@@ -159,15 +163,6 @@ export default function AssistantsIndex({ assistants, serverTypes, billingMode }
                                                         </Button>
                                                     </Link>
                                                 </div>
-
-                                                {/* Billing badge */}
-                                                {assistant.billing_mode === 'byok' && (
-                                                    <div className="pt-2 border-t">
-                                                        <Badge variant="outline" className="text-xs">
-                                                            Votre compte Hetzner
-                                                        </Badge>
-                                                    </div>
-                                                )}
                                             </div>
                                         </CardContent>
                                     </Card>

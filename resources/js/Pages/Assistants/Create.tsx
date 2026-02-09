@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { 
-    ArrowLeft, ArrowRight, Bot, MapPin, Sparkles, Check, 
+    ArrowLeft, ArrowRight, Bot, Sparkles, Check, 
     Zap, Shield, Globe, Info, ChevronDown, ChevronUp 
 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
@@ -16,8 +16,7 @@ interface ServerType {
     name: string;
     label: string;
     description: string;
-    monthly_rate: number;
-    hetzner_cost: number;
+    monthly_price: number;
 }
 
 interface Location {
@@ -29,12 +28,10 @@ interface Location {
 interface Props {
     serverTypes: ServerType[];
     locations: Location[];
-    billingMode: 'credits' | 'byok';
-    hasByokConfigured: boolean;
-    creditBalance: number | null;
+    creditBalance: number;
 }
 
-export default function CreateAssistant({ serverTypes, locations, billingMode, hasByokConfigured, creditBalance }: Props) {
+export default function CreateAssistant({ serverTypes, locations, creditBalance }: Props) {
     const [step, setStep] = useState(1);
     const [showAdvanced, setShowAdvanced] = useState(false);
     
@@ -46,7 +43,7 @@ export default function CreateAssistant({ serverTypes, locations, billingMode, h
 
     const selectedType = serverTypes.find(t => t.name === data.server_type);
     const selectedLocation = locations.find(l => l.id === data.datacenter);
-    const canCreate = billingMode === 'byok' ? hasByokConfigured : (creditBalance && creditBalance >= (selectedType?.monthly_rate || 0));
+    const canCreate = creditBalance >= (selectedType?.monthly_price || 0);
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
@@ -200,17 +197,8 @@ export default function CreateAssistant({ serverTypes, locations, billingMode, h
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        {billingMode === 'credits' ? (
-                                                            <>
-                                                                <p className="font-bold text-lg">€{type.monthly_rate.toFixed(2)}</p>
-                                                                <p className="text-sm text-muted-foreground">par mois</p>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <p className="font-bold text-lg">~€{type.hetzner_cost.toFixed(2)}</p>
-                                                                <p className="text-sm text-muted-foreground">coût Hetzner/mois</p>
-                                                            </>
-                                                        )}
+                                                        <p className="font-bold text-lg">€{type.monthly_price.toFixed(2)}</p>
+                                                        <p className="text-sm text-muted-foreground">par mois</p>
                                                     </div>
                                                 </div>
                                                 {type.name === 'cx22' && (
@@ -315,21 +303,18 @@ export default function CreateAssistant({ serverTypes, locations, billingMode, h
                                             </span>
                                         </div>
                                         <hr />
-                                        {billingMode === 'credits' ? (
-                                            <div className="flex justify-between items-center text-lg">
-                                                <span className="font-medium">Total</span>
-                                                <span className="font-bold text-primary">
-                                                    €{selectedType?.monthly_rate.toFixed(2)}/mois
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-medium">Facturation</span>
-                                                <Badge variant="outline" className="bg-green-50 text-green-700">
-                                                    Via votre compte Hetzner
-                                                </Badge>
-                                            </div>
-                                        )}
+                                        <div className="flex justify-between items-center text-lg">
+                                            <span className="font-medium">Total</span>
+                                            <span className="font-bold text-primary">
+                                                €{selectedType?.monthly_price.toFixed(2)}/mois
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Credit balance */}
+                                    <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
+                                        <span className="text-blue-700">Votre solde actuel</span>
+                                        <span className="font-bold text-blue-700">€{creditBalance.toFixed(2)}</span>
                                     </div>
 
                                     {/* Info message */}
@@ -342,10 +327,10 @@ export default function CreateAssistant({ serverTypes, locations, billingMode, h
                                     </Alert>
 
                                     {/* Insufficient credits warning */}
-                                    {billingMode === 'credits' && creditBalance !== null && creditBalance < (selectedType?.monthly_rate || 0) && (
+                                    {!canCreate && (
                                         <Alert variant="destructive">
                                             <AlertDescription>
-                                                Solde insuffisant. Vous avez €{creditBalance.toFixed(2)} mais il faut €{selectedType?.monthly_rate.toFixed(2)}.{' '}
+                                                Solde insuffisant. Vous avez €{creditBalance.toFixed(2)} mais il faut €{selectedType?.monthly_price.toFixed(2)}.{' '}
                                                 <Link href={route('credits.index')} className="underline font-medium">
                                                     Recharger mes crédits
                                                 </Link>

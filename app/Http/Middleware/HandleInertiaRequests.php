@@ -37,7 +37,7 @@ class HandleInertiaRequests extends Middleware
                     'name' => $request->user()->name,
                     'email' => $request->user()->email,
                     'is_admin' => $request->user()->is_admin,
-                    'billing_mode' => $request->user()->billing_mode,
+                    'llm_billing_mode' => $request->user()->llm_billing_mode,
                 ] : null,
             ],
             'flash' => [

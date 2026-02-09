@@ -9,7 +9,7 @@ interface User {
     name: string;
     email: string;
     is_admin?: boolean;
-    billing_mode?: 'credits' | 'byok';
+    llm_billing_mode?: 'credits' | 'byok';
 }
 
 export default function Authenticated({
@@ -49,16 +49,14 @@ export default function Authenticated({
                                     <Bot className="h-4 w-4" />
                                     Mes Assistants
                                 </NavLink>
-                                {user.billing_mode === 'credits' && (
-                                    <NavLink
-                                        href={route('credits.index')}
-                                        active={route().current('credits.*')}
-                                        className="flex items-center gap-1"
-                                    >
-                                        <Wallet className="h-4 w-4" />
-                                        Crédits
-                                    </NavLink>
-                                )}
+                                <NavLink
+                                    href={route('credits.index')}
+                                    active={route().current('credits.*')}
+                                    className="flex items-center gap-1"
+                                >
+                                    <Wallet className="h-4 w-4" />
+                                    Crédits
+                                </NavLink>
                                 {user.is_admin && (
                                     <NavLink
                                         href={route('admin.dashboard')}
@@ -184,14 +182,12 @@ export default function Authenticated({
                         >
                             Mes Assistants
                         </ResponsiveNavLink>
-                        {user.billing_mode === 'credits' && (
-                            <ResponsiveNavLink
-                                href={route('credits.index')}
-                                active={route().current('credits.*')}
-                            >
-                                Crédits
-                            </ResponsiveNavLink>
-                        )}
+                        <ResponsiveNavLink
+                            href={route('credits.index')}
+                            active={route().current('credits.*')}
+                        >
+                            Crédits
+                        </ResponsiveNavLink>
                         <ResponsiveNavLink
                             href={route('settings.index')}
                             active={route().current('settings.*')}

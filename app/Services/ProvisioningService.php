@@ -19,55 +19,32 @@ class ProvisioningService
     }
 
     /**
-     * Get the appropriate HetznerService for a user (platform or BYOK)
-     */
-    protected function getHetznerService(User $user): HetznerService
-    {
-        if ($user->isByokMode() && $user->hetzner_token) {
-            return HetznerService::withToken($user->hetzner_token);
-        }
-        return $this->hetzner;
-    }
-
-    /**
      * Create and provision a new server for a user
+     * Servers are always managed by CloudClaw (using our Hetzner account)
      */
     public function createServer(User $user, string $name, string $serverType = 'cx22', string $datacenter = 'fsn1'): Server
     {
-        $billingMode = $user->billing_mode;
+        // Check if user has enough credits for at least 1 month
+        $monthlyPrice = $this->getMonthlyPrice($serverType);
 
-        // Check requirements based on billing mode
-        if ($billingMode === 'credits') {
-            $monthlyRate = $this->getMonthlyRate($serverType);
-            $minimumCredits = $monthlyRate; // At least 1 month worth of credits
-
-            if (!$this->credits->hasEnoughCredits($user, $minimumCredits)) {
-                throw new \Exception('Crédits insuffisants. Veuillez ajouter au moins €' . number_format($minimumCredits, 2) . ' à votre compte.');
-            }
-        } else {
-            // BYOK mode - check if user has configured their token
-            if (!$user->hasByokConfigured()) {
-                throw new \Exception('Veuillez configurer votre token Hetzner dans les paramètres avant de créer un assistant.');
-            }
+        if (!$this->credits->hasEnoughCredits($user, $monthlyPrice)) {
+            throw new \Exception('Crédits insuffisants. Veuillez ajouter au moins €' . number_format($monthlyPrice, 2) . ' à votre compte.');
         }
-
-        // Get the right Hetzner service
-        $hetznerService = $this->getHetznerService($user);
 
         // Create server record
         $server = Server::create([
             'user_id' => $user->id,
-            'billing_mode' => $billingMode,
             'name' => $name,
             'server_type' => $serverType,
+            'monthly_price' => $monthlyPrice,
             'datacenter' => $datacenter,
             'status' => 'pending',
             'provision_status' => 'pending',
         ]);
 
         try {
-            // Create server on Hetzner
-            $result = $hetznerService->createServer($server);
+            // Create server on Hetzner (using CloudClaw's account)
+            $result = $this->hetzner->createServer($server);
 
             // Update server with Hetzner details
             $hetznerServer = $result['server'];
@@ -89,11 +66,8 @@ class ProvisioningService
             $server->appendProvisionLog('Assistant créé sur Hetzner');
             $server->appendProvisionLog('IP: ' . ($server->ip ?? 'en attente'));
 
-            // Deduct credits only in credits mode
-            if ($billingMode === 'credits') {
-                $monthlyRate = $this->getMonthlyRate($serverType);
-                $this->credits->deductCredits($user, $monthlyRate, 'Création assistant: ' . $name, $server->id);
-            }
+            // Deduct first month payment
+            $this->credits->deductCredits($user, $monthlyPrice, 'Création assistant: ' . $name, $server->id);
 
             // Dispatch provisioning job
             if ($rootPassword) {
@@ -102,7 +76,6 @@ class ProvisioningService
                 
                 $server->appendProvisionLog('Configuration automatique programmée');
             } else {
-                // If no root password (SSH key used), provision differently
                 $server->appendProvisionLog('Attention: Pas de mot de passe root, configuration manuelle requise');
             }
 
@@ -110,7 +83,6 @@ class ProvisioningService
                 'server_id' => $server->id,
                 'hetzner_id' => $server->hetzner_id,
                 'user_id' => $user->id,
-                'billing_mode' => $billingMode,
             ]);
 
             return $server->fresh();
@@ -136,13 +108,8 @@ class ProvisioningService
     public function deleteServer(Server $server): bool
     {
         try {
-            // Get the right Hetzner service based on server's billing mode
-            $hetznerService = $server->isByok() && $server->user->hetzner_token
-                ? HetznerService::withToken($server->user->hetzner_token)
-                : $this->hetzner;
-
             if ($server->hetzner_id) {
-                $hetznerService->deleteServer($server->hetzner_id);
+                $this->hetzner->deleteServer($server->hetzner_id);
             }
 
             // Delete email account if exists
@@ -175,19 +142,18 @@ class ProvisioningService
     }
 
     /**
-     * Get the monthly rate for a server type (in EUR)
-     * Used for credits billing
+     * Get the monthly price for a server type (in EUR)
      */
-    public function getMonthlyRate(string $serverType): float
+    public function getMonthlyPrice(string $serverType): float
     {
-        $rates = [
+        $prices = [
             'cx22' => 4.99,
             'cx32' => 9.99,
             'cx42' => 19.99,
             'cx52' => 39.99,
         ];
 
-        return $rates[$serverType] ?? 4.99;
+        return $prices[$serverType] ?? 4.99;
     }
 
     /**
@@ -200,22 +166,19 @@ class ProvisioningService
                 'name' => 'cx22',
                 'label' => 'Essentiel',
                 'description' => '2 cœurs, 4Go RAM, 40Go stockage',
-                'monthly_rate' => 4.99,
-                'hetzner_cost' => 3.29,
+                'monthly_price' => 4.99,
             ],
             [
                 'name' => 'cx32',
                 'label' => 'Confort',
                 'description' => '4 cœurs, 8Go RAM, 80Go stockage',
-                'monthly_rate' => 9.99,
-                'hetzner_cost' => 6.59,
+                'monthly_price' => 9.99,
             ],
             [
                 'name' => 'cx42',
                 'label' => 'Performance',
                 'description' => '8 cœurs, 16Go RAM, 160Go stockage',
-                'monthly_rate' => 19.99,
-                'hetzner_cost' => 13.19,
+                'monthly_price' => 19.99,
             ],
         ];
     }
@@ -225,12 +188,9 @@ class ProvisioningService
      */
     public function powerOn(Server $server): bool
     {
-        $hetznerService = $this->getHetznerServiceForServer($server);
-        
         if ($server->hetzner_id) {
-            return $hetznerService->powerOn($server->hetzner_id);
+            return $this->hetzner->powerOn($server->hetzner_id);
         }
-        
         return false;
     }
 
@@ -239,23 +199,9 @@ class ProvisioningService
      */
     public function powerOff(Server $server): bool
     {
-        $hetznerService = $this->getHetznerServiceForServer($server);
-        
         if ($server->hetzner_id) {
-            return $hetznerService->powerOff($server->hetzner_id);
+            return $this->hetzner->powerOff($server->hetzner_id);
         }
-        
         return false;
-    }
-
-    /**
-     * Get the appropriate HetznerService for a server
-     */
-    protected function getHetznerServiceForServer(Server $server): HetznerService
-    {
-        if ($server->isByok() && $server->user->hetzner_token) {
-            return HetznerService::withToken($server->user->hetzner_token);
-        }
-        return $this->hetzner;
     }
 }

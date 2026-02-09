@@ -3,7 +3,7 @@ import { Head, Link } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Wallet, Plus, Sparkles, Settings, ArrowRight } from 'lucide-react';
+import { Bot, Wallet, Plus, Sparkles, Settings, ArrowRight, Brain, Key, CreditCard } from 'lucide-react';
 
 interface Assistant {
     id: number;
@@ -12,7 +12,6 @@ interface Assistant {
     status: string;
     server_type: string;
     openclaw_installed: boolean;
-    billing_mode: string;
     created_at: string;
 }
 
@@ -28,8 +27,9 @@ interface Props {
     assistants: Assistant[];
     creditBalance: number;
     recentTransactions: Transaction[];
-    billingMode: 'credits' | 'byok';
-    hasByokConfigured: boolean;
+    llmBillingMode: 'credits' | 'byok';
+    hasLlmApiKey: boolean;
+    llmCredits: number;
     serverTypes: Array<{
         name: string;
         label: string;
@@ -46,9 +46,21 @@ const statusConfig: Record<string, { label: string; color: string; description: 
     error: { label: 'Erreur', color: 'bg-red-500', description: 'Un problème est survenu' },
 };
 
-export default function Dashboard({ assistants, creditBalance, billingMode, hasByokConfigured }: Props) {
+export default function Dashboard({ 
+    assistants, 
+    creditBalance, 
+    llmBillingMode, 
+    hasLlmApiKey,
+    llmCredits 
+}: Props) {
     const activeAssistants = assistants.filter(a => a.status === 'running');
-    const needsSetup = billingMode === 'byok' && !hasByokConfigured;
+    
+    // User needs to setup LLM if using BYOK mode without API keys
+    const needsLlmSetup = llmBillingMode === 'byok' && !hasLlmApiKey;
+    
+    // User needs credits if using credits mode and balance is low
+    const needsLlmCredits = llmBillingMode === 'credits' && llmCredits < 1;
+    const needsServerCredits = creditBalance < 5;
 
     return (
         <AuthenticatedLayout
@@ -72,15 +84,15 @@ export default function Dashboard({ assistants, creditBalance, billingMode, hasB
 
             <div className="py-8">
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    {/* Alert if BYOK not configured */}
-                    {needsSetup && (
+                    {/* Alert if LLM BYOK not configured */}
+                    {needsLlmSetup && (
                         <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <Settings className="h-5 w-5 text-amber-600" />
+                                <Key className="h-5 w-5 text-amber-600" />
                                 <div>
-                                    <p className="font-medium text-amber-800">Configuration requise</p>
+                                    <p className="font-medium text-amber-800">Configuration LLM requise</p>
                                     <p className="text-sm text-amber-600">
-                                        Configurez votre compte Hetzner pour créer des assistants
+                                        Ajoutez une clé API (Anthropic ou OpenAI) pour utiliser le mode BYOK
                                     </p>
                                 </div>
                             </div>
@@ -93,8 +105,30 @@ export default function Dashboard({ assistants, creditBalance, billingMode, hasB
                         </div>
                     )}
 
+                    {/* Alert if low on server credits */}
+                    {needsServerCredits && (
+                        <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Wallet className="h-5 w-5 text-orange-600" />
+                                <div>
+                                    <p className="font-medium text-orange-800">Crédits serveur faibles</p>
+                                    <p className="text-sm text-orange-600">
+                                        Rechargez vos crédits pour continuer à utiliser vos assistants
+                                    </p>
+                                </div>
+                            </div>
+                            <Link href={route('credits.index')}>
+                                <Button variant="outline" size="sm">
+                                    Recharger
+                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </Link>
+                        </div>
+                    )}
+
                     {/* Stats Grid */}
-                    <div className="grid gap-4 md:grid-cols-3 mb-8">
+                    <div className="grid gap-4 md:grid-cols-4 mb-8">
+                        {/* Assistants Count */}
                         <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">Mes Assistants</CardTitle>
@@ -110,52 +144,71 @@ export default function Dashboard({ assistants, creditBalance, billingMode, hasB
                             </CardContent>
                         </Card>
 
-                        {billingMode === 'credits' && (
+                        {/* Server Credits */}
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Crédits Serveur</CardTitle>
+                                <CreditCard className="h-5 w-5 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-3xl font-bold">€{Number(creditBalance).toFixed(2)}</div>
+                                <Link href={route('credits.index')}>
+                                    <Button variant="link" className="p-0 h-auto text-sm text-primary">
+                                        Recharger →
+                                    </Button>
+                                </Link>
+                            </CardContent>
+                        </Card>
+
+                        {/* LLM Mode Card */}
+                        {llmBillingMode === 'credits' ? (
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Solde Crédits</CardTitle>
-                                    <Wallet className="h-5 w-5 text-muted-foreground" />
+                                    <CardTitle className="text-sm font-medium">Crédits LLM</CardTitle>
+                                    <Brain className="h-5 w-5 text-muted-foreground" />
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-3xl font-bold">€{Number(creditBalance).toFixed(2)}</div>
+                                    <div className="text-3xl font-bold">€{Number(llmCredits).toFixed(2)}</div>
                                     <Link href={route('credits.index')}>
                                         <Button variant="link" className="p-0 h-auto text-sm text-primary">
-                                            Recharger mes crédits →
+                                            Recharger →
                                         </Button>
                                     </Link>
                                 </CardContent>
                             </Card>
-                        )}
-
-                        {billingMode === 'byok' && (
+                        ) : (
                             <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Mode BYOK</CardTitle>
+                                    <CardTitle className="text-sm font-medium">Mode LLM</CardTitle>
                                     <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
-                                        Actif
+                                        BYOK
                                     </Badge>
                                 </CardHeader>
                                 <CardContent>
                                     <p className="text-sm text-muted-foreground">
-                                        Vous utilisez votre propre compte Hetzner
+                                        {hasLlmApiKey 
+                                            ? 'Vos propres clés API' 
+                                            : 'Configuration requise'
+                                        }
                                     </p>
                                     <Link href={route('settings.index')}>
                                         <Button variant="link" className="p-0 h-auto text-sm text-green-700">
-                                            Gérer les paramètres →
+                                            Gérer →
                                         </Button>
                                     </Link>
                                 </CardContent>
                             </Card>
                         )}
 
+                        {/* Create Assistant */}
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Créer un assistant</CardTitle>
+                                <CardTitle className="text-sm font-medium">Créer</CardTitle>
                                 <Plus className="h-5 w-5 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
                                 <Link href={route('assistants.create')}>
-                                    <Button className="w-full" disabled={needsSetup}>
+                                    <Button className="w-full">
                                         <Plus className="mr-2 h-4 w-4" />
                                         Nouvel assistant
                                     </Button>
@@ -194,7 +247,7 @@ export default function Dashboard({ assistants, creditBalance, billingMode, hasB
                                         Il sera prêt en quelques minutes !
                                     </p>
                                     <Link href={route('assistants.create')}>
-                                        <Button disabled={needsSetup}>
+                                        <Button>
                                             <Plus className="mr-2 h-4 w-4" />
                                             Créer mon premier assistant
                                         </Button>

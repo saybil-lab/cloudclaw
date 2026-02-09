@@ -12,12 +12,12 @@ class Server extends Model
 
     protected $fillable = [
         'user_id',
-        'billing_mode',
         'hetzner_id',
         'name',
         'ip',
         'status',
         'server_type',
+        'monthly_price',
         'datacenter',
         'image',
         'specs',
@@ -36,6 +36,7 @@ class Server extends Model
         'specs' => 'array',
         'openclaw_installed' => 'boolean',
         'provisioned_at' => 'datetime',
+        'monthly_price' => 'decimal:2',
     ];
 
     protected $hidden = [
@@ -62,22 +63,6 @@ class Server extends Model
     public function isReady(): bool
     {
         return $this->provision_status === 'ready' && $this->status === 'running';
-    }
-
-    /**
-     * Check if this server uses BYOK billing
-     */
-    public function isByok(): bool
-    {
-        return $this->billing_mode === 'byok';
-    }
-
-    /**
-     * Check if this server uses credits billing
-     */
-    public function usesCredits(): bool
-    {
-        return $this->billing_mode === 'credits';
     }
 
     public function appendProvisionLog(string $message): void

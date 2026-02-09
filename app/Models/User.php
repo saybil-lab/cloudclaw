@@ -26,8 +26,10 @@ class User extends Authenticatable
         'password',
         'is_admin',
         'stripe_customer_id',
-        'billing_mode',
-        'hetzner_token',
+        'llm_billing_mode',
+        'anthropic_api_key',
+        'openai_api_key',
+        'llm_credits',
     ];
 
     /**
@@ -38,7 +40,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
-        'hetzner_token',
+        'anthropic_api_key',
+        'openai_api_key',
     ];
 
     /**
@@ -52,25 +55,36 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'llm_credits' => 'decimal:2',
         ];
     }
 
     /**
-     * Encrypt the Hetzner token when setting
+     * Encrypt API keys when setting
      */
-    public function setHetznerTokenAttribute(?string $value): void
+    public function setAnthropicApiKeyAttribute(?string $value): void
     {
-        $this->attributes['hetzner_token'] = $value ? Crypt::encryptString($value) : null;
+        $this->attributes['anthropic_api_key'] = $value ? Crypt::encryptString($value) : null;
     }
 
-    /**
-     * Decrypt the Hetzner token when getting
-     */
-    public function getHetznerTokenAttribute(?string $value): ?string
+    public function getAnthropicApiKeyAttribute(?string $value): ?string
     {
-        if (!$value) {
+        if (!$value) return null;
+        try {
+            return Crypt::decryptString($value);
+        } catch (\Exception $e) {
             return null;
         }
+    }
+
+    public function setOpenaiApiKeyAttribute(?string $value): void
+    {
+        $this->attributes['openai_api_key'] = $value ? Crypt::encryptString($value) : null;
+    }
+
+    public function getOpenaiApiKeyAttribute(?string $value): ?string
+    {
+        if (!$value) return null;
         try {
             return Crypt::decryptString($value);
         } catch (\Exception $e) {
@@ -104,26 +118,38 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if user is in BYOK mode
+     * Check if user uses their own LLM API keys (BYOK)
      */
-    public function isByokMode(): bool
+    public function isLlmByokMode(): bool
     {
-        return $this->billing_mode === 'byok';
+        return $this->llm_billing_mode === 'byok';
     }
 
     /**
-     * Check if user is in credits mode
+     * Check if user uses CloudClaw LLM credits
      */
-    public function isCreditsMode(): bool
+    public function isLlmCreditsMode(): bool
     {
-        return $this->billing_mode === 'credits';
+        return $this->llm_billing_mode === 'credits';
     }
 
     /**
-     * Check if user has configured BYOK
+     * Check if user has configured at least one LLM API key
      */
-    public function hasByokConfigured(): bool
+    public function hasLlmApiKey(): bool
     {
-        return $this->billing_mode === 'byok' && !empty($this->hetzner_token);
+        return !empty($this->anthropic_api_key) || !empty($this->openai_api_key);
+    }
+
+    /**
+     * Get the user's preferred LLM API key
+     */
+    public function getLlmApiKey(string $provider = 'anthropic'): ?string
+    {
+        return match($provider) {
+            'anthropic' => $this->anthropic_api_key,
+            'openai' => $this->openai_api_key,
+            default => null,
+        };
     }
 }

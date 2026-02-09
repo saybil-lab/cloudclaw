@@ -31,8 +31,9 @@ class DashboardController extends Controller
             'creditBalance' => $creditBalance,
             'recentTransactions' => $recentTransactions,
             'serverTypes' => $this->provisioningService->getAvailableServerTypes(),
-            'billingMode' => $user->billing_mode,
-            'hasByokConfigured' => $user->hasByokConfigured(),
+            'llmBillingMode' => $user->llm_billing_mode,
+            'hasLlmApiKey' => $user->hasLlmApiKey(),
+            'llmCredits' => (float) $user->llm_credits,
         ]);
     }
 }

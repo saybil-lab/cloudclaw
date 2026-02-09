@@ -88,8 +88,10 @@ class CreditService
     /**
      * Create a Stripe Checkout Session for credit purchase
      * This is the recommended way to handle payments with Stripe
+     * 
+     * @param string $creditType 'server' for server credits, 'llm' for LLM credits
      */
-    public function createCheckoutSession(User $user, float $amount, string $successUrl, string $cancelUrl): array
+    public function createCheckoutSession(User $user, float $amount, string $successUrl, string $cancelUrl, string $creditType = 'server'): array
     {
         if ($this->isMockMode()) {
             // Mock response for development
@@ -103,6 +105,11 @@ class CreditService
         // Ensure user has a Stripe customer
         $customerId = $this->getOrCreateStripeCustomer($user);
 
+        $productName = $creditType === 'llm' ? 'CloudClaw LLM Credits' : 'CloudClaw Server Credits';
+        $productDescription = $creditType === 'llm' 
+            ? "€{$amount} in LLM credits for AI models"
+            : "€{$amount} in server hosting credits";
+
         try {
             $session = $this->stripe->checkout->sessions->create([
                 'customer' => $customerId,
@@ -111,20 +118,21 @@ class CreditService
                     'price_data' => [
                         'currency' => 'eur',
                         'product_data' => [
-                            'name' => 'CloudClaw Credits',
-                            'description' => "€{$amount} in CloudClaw credits",
+                            'name' => $productName,
+                            'description' => $productDescription,
                         ],
                         'unit_amount' => (int) ($amount * 100), // Convert to cents
                     ],
                     'quantity' => 1,
                 ]],
                 'mode' => 'payment',
-                'success_url' => $successUrl . '?session_id={CHECKOUT_SESSION_ID}',
+                'success_url' => $successUrl . '&session_id={CHECKOUT_SESSION_ID}',
                 'cancel_url' => $cancelUrl,
                 'metadata' => [
                     'user_id' => $user->id,
                     'credit_amount' => $amount,
-                    'type' => 'credit_purchase',
+                    'credit_type' => $creditType,
+                    'type' => $creditType === 'llm' ? 'llm_credit_purchase' : 'server_credit_purchase',
                 ],
             ]);
 
@@ -132,6 +140,7 @@ class CreditService
                 'session_id' => $session->id,
                 'user_id' => $user->id,
                 'amount' => $amount,
+                'credit_type' => $creditType,
             ]);
 
             return [

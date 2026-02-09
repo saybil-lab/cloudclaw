@@ -39,17 +39,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::redirect('/servers', '/assistants');
     Route::redirect('/servers/create', '/assistants/create');
 
-    // Credits
+    // Credits (for servers)
     Route::get('/credits', [CreditController::class, 'index'])->name('credits.index');
     Route::post('/credits/purchase', [CreditController::class, 'purchase'])->name('credits.purchase');
     Route::get('/credits/success', [CreditController::class, 'success'])->name('credits.success');
     Route::post('/credits/confirm', [CreditController::class, 'confirm'])->name('credits.confirm');
 
-    // Settings (Paramètres)
+    // Settings (LLM billing mode and API keys)
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
-    Route::post('/settings/billing-mode', [SettingsController::class, 'updateBillingMode'])->name('settings.billing-mode');
-    Route::post('/settings/hetzner-token', [SettingsController::class, 'updateHetznerToken'])->name('settings.hetzner-token');
-    Route::delete('/settings/hetzner-token', [SettingsController::class, 'removeHetznerToken'])->name('settings.hetzner-token.delete');
+    Route::post('/settings/llm-billing-mode', [SettingsController::class, 'updateLlmBillingMode'])->name('settings.llm-billing-mode');
+    Route::post('/settings/api-key', [SettingsController::class, 'updateApiKey'])->name('settings.api-key');
+    Route::delete('/settings/api-key', [SettingsController::class, 'removeApiKey'])->name('settings.api-key.delete');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Table,
     TableBody,
@@ -12,7 +13,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { CreditCard, TrendingUp, TrendingDown, Wallet, CheckCircle2, AlertCircle, Sparkles, ArrowLeft } from 'lucide-react';
+import { 
+    CreditCard, TrendingUp, TrendingDown, Wallet, CheckCircle2, 
+    AlertCircle, Sparkles, ArrowLeft, Brain, Server, Key 
+} from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface Transaction {
@@ -35,7 +39,9 @@ interface CreditPackage {
 }
 
 interface Props {
-    balance: number;
+    serverBalance: number;
+    llmBalance: number;
+    llmBillingMode: 'credits' | 'byok';
     transactions: Transaction[];
     packages: CreditPackage[];
     stripeKey?: string;
@@ -49,7 +55,8 @@ interface Flash {
 }
 
 const typeLabels: Record<string, string> = {
-    purchase: 'Achat',
+    purchase: 'Achat serveur',
+    llm_purchase: 'Achat LLM',
     usage: 'Utilisation',
     refund: 'Remboursement',
     bonus: 'Bonus',
@@ -57,16 +64,25 @@ const typeLabels: Record<string, string> = {
 
 const typeIcons: Record<string, React.ReactNode> = {
     purchase: <TrendingUp className="h-4 w-4 text-green-500" />,
+    llm_purchase: <TrendingUp className="h-4 w-4 text-purple-500" />,
     usage: <TrendingDown className="h-4 w-4 text-red-500" />,
     refund: <TrendingUp className="h-4 w-4 text-blue-500" />,
     bonus: <Sparkles className="h-4 w-4 text-purple-500" />,
 };
 
-export default function CreditsIndex({ balance, transactions, packages, mockMode }: Props) {
+export default function CreditsIndex({ 
+    serverBalance, 
+    llmBalance, 
+    llmBillingMode,
+    transactions, 
+    packages, 
+    mockMode 
+}: Props) {
     const { flash } = usePage().props as { flash?: Flash };
     const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [customAmount, setCustomAmount] = useState('');
+    const [creditType, setCreditType] = useState<'server' | 'llm'>('server');
     const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
     useEffect(() => {
@@ -95,7 +111,7 @@ export default function CreditsIndex({ balance, transactions, packages, mockMode
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 },
-                body: JSON.stringify({ amount }),
+                body: JSON.stringify({ amount, type: creditType }),
             });
 
             const data = await response.json();
@@ -107,7 +123,8 @@ export default function CreditsIndex({ balance, transactions, packages, mockMode
 
             // Mock mode - credits added directly
             if (data.mock || data.success) {
-                setMessage({ type: 'success', text: `${amount}€ de crédits ajoutés avec succès !` });
+                const label = creditType === 'llm' ? 'crédits LLM' : 'crédits serveur';
+                setMessage({ type: 'success', text: `${amount}€ de ${label} ajoutés avec succès !` });
                 router.reload();
                 return;
             }
@@ -118,27 +135,6 @@ export default function CreditsIndex({ balance, transactions, packages, mockMode
                 return;
             }
 
-            // Legacy payment intent flow (fallback)
-            if (data.clientSecret) {
-                const confirmResponse = await fetch(route('credits.confirm'), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    },
-                    body: JSON.stringify({ 
-                        payment_intent_id: data.clientSecret,
-                        amount 
-                    }),
-                });
-
-                if (confirmResponse.ok) {
-                    setMessage({ type: 'success', text: 'Paiement réussi ! Crédits ajoutés.' });
-                    router.reload();
-                } else {
-                    setMessage({ type: 'error', text: 'Erreur de confirmation du paiement.' });
-                }
-            }
         } catch (error) {
             console.error('Purchase failed:', error);
             setMessage({ type: 'error', text: 'Une erreur est survenue. Veuillez réessayer.' });
@@ -169,7 +165,7 @@ export default function CreditsIndex({ balance, transactions, packages, mockMode
                                 Mes Crédits
                             </h2>
                             <p className="text-sm text-muted-foreground">
-                                Gérez votre solde et vos achats
+                                Gérez vos crédits serveur et LLM
                             </p>
                         </div>
                     </div>
@@ -214,25 +210,74 @@ export default function CreditsIndex({ balance, transactions, packages, mockMode
                         </Alert>
                     )}
 
-                    {/* Balance Card */}
-                    <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle>Solde actuel</CardTitle>
-                                    <CardDescription>
-                                        Utilisez vos crédits pour vos assistants IA
-                                    </CardDescription>
+                    {/* Balance Cards */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                        {/* Server Credits */}
+                        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Server className="h-5 w-5 text-blue-600" />
+                                        <CardTitle className="text-lg">Crédits Serveur</CardTitle>
+                                    </div>
                                 </div>
-                                <Wallet className="h-10 w-10 text-primary" />
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-5xl font-bold text-primary">
-                                €{Number(balance).toFixed(2)}
-                            </div>
-                        </CardContent>
-                    </Card>
+                                <CardDescription className="text-blue-600">
+                                    Pour l'hébergement de vos assistants
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-4xl font-bold text-blue-700">
+                                    €{Number(serverBalance).toFixed(2)}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* LLM Credits */}
+                        <Card className={`${
+                            llmBillingMode === 'byok' 
+                                ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
+                                : 'bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200'
+                        }`}>
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Brain className={`h-5 w-5 ${llmBillingMode === 'byok' ? 'text-green-600' : 'text-purple-600'}`} />
+                                        <CardTitle className="text-lg">
+                                            {llmBillingMode === 'byok' ? 'Mode BYOK' : 'Crédits LLM'}
+                                        </CardTitle>
+                                    </div>
+                                    {llmBillingMode === 'byok' && (
+                                        <Badge className="bg-green-600">
+                                            <Key className="h-3 w-3 mr-1" />
+                                            Actif
+                                        </Badge>
+                                    )}
+                                </div>
+                                <CardDescription className={llmBillingMode === 'byok' ? 'text-green-600' : 'text-purple-600'}>
+                                    {llmBillingMode === 'byok' 
+                                        ? 'Vous utilisez vos propres clés API'
+                                        : 'Pour l\'intelligence artificielle'
+                                    }
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {llmBillingMode === 'byok' ? (
+                                    <div className="text-lg text-green-700">
+                                        Pas besoin de crédits LLM
+                                        <Link href={route('settings.index')}>
+                                            <Button variant="link" className="p-0 h-auto text-sm text-green-700 block">
+                                                Gérer mes clés API →
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                ) : (
+                                    <div className="text-4xl font-bold text-purple-700">
+                                        €{Number(llmBalance).toFixed(2)}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
 
                     {/* Purchase Credits */}
                     <Card>
@@ -242,69 +287,133 @@ export default function CreditsIndex({ balance, transactions, packages, mockMode
                                 Recharger mes crédits
                             </CardTitle>
                             <CardDescription>
-                                Choisissez un montant ou entrez un montant personnalisé
+                                Choisissez le type de crédit et un montant
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                {packages.map((pkg) => (
-                                    <button
-                                        key={pkg.amount}
-                                        onClick={() => {
-                                            setSelectedPackage(pkg.amount);
-                                            setCustomAmount('');
-                                        }}
-                                        className={`relative p-4 rounded-xl border-2 transition-all ${
-                                            selectedPackage === pkg.amount
-                                                ? 'border-primary bg-primary/5 shadow-sm'
-                                                : 'border-gray-200 hover:border-gray-300'
-                                        }`}
-                                    >
-                                        <div className="text-xl font-bold">{pkg.label}</div>
-                                        {pkg.bonus > 0 && (
-                                            <Badge className="absolute -top-2 -right-2 text-xs bg-green-500">
-                                                +{pkg.bonus}€
-                                            </Badge>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                <div className="flex-1">
-                                    <label className="text-sm text-muted-foreground">Montant personnalisé (€)</label>
-                                    <input
-                                        type="number"
-                                        min="5"
-                                        max="1000"
-                                        step="0.01"
-                                        value={customAmount}
-                                        onChange={(e) => {
-                                            setCustomAmount(e.target.value);
-                                            setSelectedPackage(null);
-                                        }}
-                                        placeholder="Minimum 5€"
-                                        className="w-full mt-1 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                    />
-                                </div>
-                            </div>
-
-                            <Button
-                                onClick={() => handlePurchase(purchaseAmount)}
-                                disabled={loading || purchaseAmount < 5}
-                                className="w-full"
-                                size="lg"
+                            {/* Credit Type Selection */}
+                            <Tabs 
+                                value={creditType} 
+                                onValueChange={(value) => {
+                                    setCreditType(value as 'server' | 'llm');
+                                    setSelectedPackage(null);
+                                    setCustomAmount('');
+                                }}
                             >
-                                <CreditCard className="mr-2 h-5 w-5" />
-                                {loading ? 'Traitement...' : `Acheter ${purchaseAmount.toFixed(2)}€ de crédits`}
-                            </Button>
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="server" className="gap-2">
+                                        <Server className="h-4 w-4" />
+                                        Crédits Serveur
+                                    </TabsTrigger>
+                                    <TabsTrigger 
+                                        value="llm" 
+                                        className="gap-2"
+                                        disabled={llmBillingMode === 'byok'}
+                                    >
+                                        <Brain className="h-4 w-4" />
+                                        Crédits LLM
+                                    </TabsTrigger>
+                                </TabsList>
 
-                            <p className="text-sm text-muted-foreground text-center">
-                                {mockMode 
-                                    ? 'Mode développement : les crédits seront ajoutés instantanément.'
-                                    : 'Paiement sécurisé par Stripe. Les crédits n\'expirent jamais.'
-                                }
-                            </p>
+                                <TabsContent value="server" className="space-y-4 mt-4">
+                                    <p className="text-sm text-muted-foreground">
+                                        Les crédits serveur sont utilisés pour payer l'hébergement mensuel de vos assistants.
+                                    </p>
+                                </TabsContent>
+
+                                <TabsContent value="llm" className="space-y-4 mt-4">
+                                    {llmBillingMode === 'byok' ? (
+                                        <Alert className="border-green-200 bg-green-50">
+                                            <Key className="h-4 w-4 text-green-600" />
+                                            <AlertDescription className="text-green-700">
+                                                Vous êtes en mode BYOK. Vous utilisez vos propres clés API et n'avez pas besoin de crédits LLM.
+                                                <Link href={route('settings.index')}>
+                                                    <Button variant="link" className="p-0 h-auto text-green-700">
+                                                        Passer en mode Crédits →
+                                                    </Button>
+                                                </Link>
+                                            </AlertDescription>
+                                        </Alert>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">
+                                            Les crédits LLM sont utilisés pour les appels aux modèles d'IA (Claude, GPT, etc.).
+                                        </p>
+                                    )}
+                                </TabsContent>
+                            </Tabs>
+
+                            {/* Amount Selection (only if not BYOK for LLM) */}
+                            {!(creditType === 'llm' && llmBillingMode === 'byok') && (
+                                <>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        {packages.map((pkg) => (
+                                            <button
+                                                key={pkg.amount}
+                                                onClick={() => {
+                                                    setSelectedPackage(pkg.amount);
+                                                    setCustomAmount('');
+                                                }}
+                                                className={`relative p-4 rounded-xl border-2 transition-all ${
+                                                    selectedPackage === pkg.amount
+                                                        ? creditType === 'llm' 
+                                                            ? 'border-purple-500 bg-purple-50 shadow-sm'
+                                                            : 'border-blue-500 bg-blue-50 shadow-sm'
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                }`}
+                                            >
+                                                <div className="text-xl font-bold">{pkg.label}</div>
+                                                {pkg.bonus > 0 && (
+                                                    <Badge className={`absolute -top-2 -right-2 text-xs ${
+                                                        creditType === 'llm' ? 'bg-purple-500' : 'bg-green-500'
+                                                    }`}>
+                                                        +{pkg.bonus}€
+                                                    </Badge>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex-1">
+                                            <label className="text-sm text-muted-foreground">Montant personnalisé (€)</label>
+                                            <input
+                                                type="number"
+                                                min="5"
+                                                max="1000"
+                                                step="0.01"
+                                                value={customAmount}
+                                                onChange={(e) => {
+                                                    setCustomAmount(e.target.value);
+                                                    setSelectedPackage(null);
+                                                }}
+                                                placeholder="Minimum 5€"
+                                                className="w-full mt-1 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        onClick={() => handlePurchase(purchaseAmount)}
+                                        disabled={loading || purchaseAmount < 5}
+                                        className={`w-full ${creditType === 'llm' ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
+                                        size="lg"
+                                    >
+                                        {creditType === 'llm' ? (
+                                            <Brain className="mr-2 h-5 w-5" />
+                                        ) : (
+                                            <Server className="mr-2 h-5 w-5" />
+                                        )}
+                                        {loading ? 'Traitement...' : `Acheter ${purchaseAmount.toFixed(2)}€ de crédits ${creditType === 'llm' ? 'LLM' : 'serveur'}`}
+                                    </Button>
+
+                                    <p className="text-sm text-muted-foreground text-center">
+                                        {mockMode 
+                                            ? 'Mode développement : les crédits seront ajoutés instantanément.'
+                                            : 'Paiement sécurisé par Stripe. Les crédits n\'expirent jamais.'
+                                        }
+                                    </p>
+                                </>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -339,7 +448,7 @@ export default function CreditsIndex({ balance, transactions, packages, mockMode
                                             <TableRow key={tx.id}>
                                                 <TableCell>
                                                     <div className="flex items-center gap-2">
-                                                        {typeIcons[tx.type]}
+                                                        {typeIcons[tx.type] || typeIcons['purchase']}
                                                         <span>{typeLabels[tx.type] || tx.type}</span>
                                                     </div>
                                                 </TableCell>

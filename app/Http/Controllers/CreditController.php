@@ -17,7 +17,9 @@ class CreditController extends Controller
         $user = $request->user();
 
         return Inertia::render('Credits/Index', [
-            'balance' => $this->creditService->getBalance($user),
+            'serverBalance' => $this->creditService->getBalance($user),
+            'llmBalance' => (float) $user->llm_credits,
+            'llmBillingMode' => $user->llm_billing_mode,
             'transactions' => $this->creditService->getTransactions($user, 50),
             'packages' => $this->creditService->getCreditPackages(),
             'stripeKey' => config('services.stripe.key'),
@@ -32,35 +34,43 @@ class CreditController extends Controller
     {
         $validated = $request->validate([
             'amount' => 'required|numeric|min:5|max:1000',
+            'type' => 'sometimes|string|in:server,llm',
         ]);
 
         $user = $request->user();
         $amount = (float) $validated['amount'];
+        $type = $validated['type'] ?? 'server';
 
         try {
-            $successUrl = route('credits.success');
+            $successUrl = route('credits.success', ['type' => $type]);
             $cancelUrl = route('credits.index');
 
             $session = $this->creditService->createCheckoutSession(
                 $user,
                 $amount,
                 $successUrl,
-                $cancelUrl
+                $cancelUrl,
+                $type
             );
 
-            // If mock mode, add credits directly and redirect
+            // If mock mode, add credits directly
             if ($session['mock'] ?? false) {
-                $this->creditService->addCredits(
-                    $user,
-                    $amount,
-                    'purchase',
-                    'Credit purchase (mock mode)'
-                );
+                if ($type === 'llm') {
+                    $user->increment('llm_credits', $amount);
+                } else {
+                    $this->creditService->addCredits(
+                        $user,
+                        $amount,
+                        'purchase',
+                        'Credit purchase (mock mode)'
+                    );
+                }
 
                 return response()->json([
                     'success' => true,
                     'mock' => true,
-                    'balance' => $this->creditService->getBalance($user),
+                    'serverBalance' => $this->creditService->getBalance($user),
+                    'llmBalance' => (float) $user->fresh()->llm_credits,
                 ]);
             }
 
@@ -80,12 +90,13 @@ class CreditController extends Controller
     public function success(Request $request)
     {
         $sessionId = $request->get('session_id');
+        $type = $request->get('type', 'server');
         $user = $request->user();
 
         // If mock mode
         if ($request->get('mock')) {
             return redirect()->route('credits.index')
-                ->with('success', 'Credits added successfully!');
+                ->with('success', 'Crédits ajoutés avec succès !');
         }
 
         // Verify the checkout session
@@ -97,22 +108,35 @@ class CreditController extends Controller
                 $existing = \App\Models\CreditTransaction::where('stripe_payment_intent_id', $result['payment_intent'])->first();
                 
                 if (!$existing) {
-                    $this->creditService->addCredits(
-                        $user,
-                        $result['amount'],
-                        'purchase',
-                        'Credit purchase via Stripe',
-                        $result['payment_intent']
-                    );
+                    if ($type === 'llm') {
+                        $user->increment('llm_credits', $result['amount']);
+                        // Log the transaction
+                        $this->creditService->addCredits(
+                            $user,
+                            0, // No server credits
+                            'llm_purchase',
+                            'LLM credit purchase: €' . $result['amount'],
+                            $result['payment_intent']
+                        );
+                    } else {
+                        $this->creditService->addCredits(
+                            $user,
+                            $result['amount'],
+                            'purchase',
+                            'Server credit purchase via Stripe',
+                            $result['payment_intent']
+                        );
+                    }
                 }
 
+                $label = $type === 'llm' ? 'crédits LLM' : 'crédits serveur';
                 return redirect()->route('credits.index')
-                    ->with('success', 'Payment successful! €' . $result['amount'] . ' credits added.');
+                    ->with('success', 'Paiement réussi ! €' . $result['amount'] . ' ' . $label . ' ajoutés.');
             }
         }
 
         return redirect()->route('credits.index')
-            ->with('info', 'Payment processing. Credits will be added shortly.');
+            ->with('info', 'Paiement en cours de traitement. Les crédits seront ajoutés sous peu.');
     }
 
     /**

@@ -8,14 +8,16 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { 
     Settings, CreditCard, Key, Check, AlertCircle, 
-    ExternalLink, Wallet, Shield, HelpCircle, Trash2
+    ExternalLink, Wallet, HelpCircle, Trash2, Sparkles, Bot
 } from 'lucide-react';
 import { useState, useEffect, FormEvent } from 'react';
 
 interface Props {
-    billingMode: 'credits' | 'byok';
-    hasHetznerToken: boolean;
-    creditBalance: number;
+    llmBillingMode: 'credits' | 'byok';
+    hasAnthropicKey: boolean;
+    hasOpenaiKey: boolean;
+    llmCredits: number;
+    serverCredits: number;
 }
 
 interface Flash {
@@ -23,17 +25,24 @@ interface Flash {
     error?: string;
 }
 
-export default function SettingsIndex({ billingMode, hasHetznerToken, creditBalance }: Props) {
+export default function SettingsIndex({ llmBillingMode, hasAnthropicKey, hasOpenaiKey, llmCredits, serverCredits }: Props) {
     const { flash } = usePage().props as { flash?: Flash };
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-    const [showTokenForm, setShowTokenForm] = useState(false);
+    const [showAnthropicForm, setShowAnthropicForm] = useState(false);
+    const [showOpenaiForm, setShowOpenaiForm] = useState(false);
 
     const billingForm = useForm({
-        billing_mode: billingMode,
+        llm_billing_mode: llmBillingMode,
     });
 
-    const tokenForm = useForm({
-        hetzner_token: '',
+    const anthropicForm = useForm({
+        provider: 'anthropic',
+        api_key: '',
+    });
+
+    const openaiForm = useForm({
+        provider: 'openai',
+        api_key: '',
     });
 
     useEffect(() => {
@@ -45,34 +54,44 @@ export default function SettingsIndex({ billingMode, hasHetznerToken, creditBala
     }, [flash]);
 
     const handleBillingModeChange = (mode: 'credits' | 'byok') => {
-        if (mode === 'byok' && !hasHetznerToken) {
-            setShowTokenForm(true);
+        if (mode === 'byok' && !hasAnthropicKey && !hasOpenaiKey) {
+            setMessage({ type: 'error', text: 'Veuillez d\'abord configurer au moins une clé API.' });
             return;
         }
-        billingForm.setData('billing_mode', mode);
-        billingForm.post(route('settings.billing-mode'), {
+        billingForm.setData('llm_billing_mode', mode);
+        billingForm.post(route('settings.llm-billing-mode'), {
             preserveScroll: true,
         });
     };
 
-    const handleTokenSubmit = (e: FormEvent) => {
+    const handleApiKeySubmit = (e: FormEvent, provider: 'anthropic' | 'openai') => {
         e.preventDefault();
-        tokenForm.post(route('settings.hetzner-token'), {
+        const form = provider === 'anthropic' ? anthropicForm : openaiForm;
+        form.post(route('settings.api-key'), {
             preserveScroll: true,
             onSuccess: () => {
-                setShowTokenForm(false);
-                tokenForm.reset();
+                if (provider === 'anthropic') {
+                    setShowAnthropicForm(false);
+                    anthropicForm.reset();
+                } else {
+                    setShowOpenaiForm(false);
+                    openaiForm.reset();
+                }
             },
         });
     };
 
-    const handleRemoveToken = () => {
-        if (confirm('Voulez-vous vraiment supprimer votre token Hetzner ? Vous passerez automatiquement en mode Crédits.')) {
-            tokenForm.delete(route('settings.hetzner-token.delete'), {
+    const handleRemoveKey = (provider: 'anthropic' | 'openai') => {
+        if (confirm(`Voulez-vous vraiment supprimer votre clé API ${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} ?`)) {
+            const form = useForm({ provider });
+            form.delete(route('settings.api-key.delete'), {
                 preserveScroll: true,
+                data: { provider },
             });
         }
     };
+
+    const hasAnyApiKey = hasAnthropicKey || hasOpenaiKey;
 
     return (
         <AuthenticatedLayout
@@ -86,7 +105,7 @@ export default function SettingsIndex({ billingMode, hasHetznerToken, creditBala
                             Paramètres
                         </h2>
                         <p className="text-sm text-muted-foreground">
-                            Gérez votre mode de facturation
+                            Gérez vos clés API et votre mode de facturation
                         </p>
                     </div>
                 </div>
@@ -110,22 +129,57 @@ export default function SettingsIndex({ billingMode, hasHetznerToken, creditBala
                         </Alert>
                     )}
 
-                    {/* Billing Mode Selection */}
+                    {/* Credits Summary */}
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                    <Bot className="h-4 w-4" />
+                                    Crédits Serveur
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">€{serverCredits.toFixed(2)}</div>
+                                <Link href={route('credits.index')}>
+                                    <Button variant="link" className="p-0 h-auto text-sm">
+                                        Recharger →
+                                    </Button>
+                                </Link>
+                            </CardContent>
+                        </Card>
+
+                        {llmBillingMode === 'credits' && (
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                        <Sparkles className="h-4 w-4" />
+                                        Crédits LLM
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">€{llmCredits.toFixed(2)}</div>
+                                    <p className="text-sm text-muted-foreground">Pour l'utilisation de l'IA</p>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+
+                    {/* LLM Billing Mode Selection */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <Wallet className="h-5 w-5" />
-                                Mode de facturation
+                                <Sparkles className="h-5 w-5" />
+                                Mode de facturation IA (LLM)
                             </CardTitle>
                             <CardDescription>
-                                Choisissez comment vous souhaitez payer vos assistants
+                                Choisissez comment vos assistants accèdent à l'intelligence artificielle
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {/* Credits Mode */}
                             <div
                                 className={`relative flex cursor-pointer rounded-xl border-2 p-5 transition-all ${
-                                    billingMode === 'credits'
+                                    llmBillingMode === 'credits'
                                         ? 'border-primary bg-primary/5'
                                         : 'border-gray-200 hover:border-gray-300'
                                 }`}
@@ -134,33 +188,32 @@ export default function SettingsIndex({ billingMode, hasHetznerToken, creditBala
                                 <div className="flex w-full items-start justify-between">
                                     <div className="flex items-start gap-4">
                                         <div className={`p-3 rounded-full ${
-                                            billingMode === 'credits' ? 'bg-primary text-white' : 'bg-gray-100'
+                                            llmBillingMode === 'credits' ? 'bg-primary text-white' : 'bg-gray-100'
                                         }`}>
                                             <CreditCard className="h-6 w-6" />
                                         </div>
                                         <div>
                                             <p className="font-semibold text-lg">Crédits CloudClaw</p>
                                             <p className="text-muted-foreground mt-1">
-                                                Achetez des crédits et nous gérons tout pour vous. 
-                                                Simple et sans prise de tête.
+                                                Achetez des crédits LLM et nous gérons tout pour vous.
                                             </p>
                                             <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
                                                 <li className="flex items-center gap-2">
                                                     <Check className="h-4 w-4 text-green-500" />
-                                                    Paiement simple par carte
+                                                    Pas besoin de créer de compte chez Anthropic/OpenAI
+                                                </li>
+                                                <li className="flex items-center gap-2">
+                                                    <Check className="h-4 w-4 text-green-500" />
+                                                    Facturation unifiée et simple
                                                 </li>
                                                 <li className="flex items-center gap-2">
                                                     <Check className="h-4 w-4 text-green-500" />
                                                     Support inclus
                                                 </li>
-                                                <li className="flex items-center gap-2">
-                                                    <Check className="h-4 w-4 text-green-500" />
-                                                    Pas de compte Hetzner à créer
-                                                </li>
                                             </ul>
                                         </div>
                                     </div>
-                                    {billingMode === 'credits' && (
+                                    {llmBillingMode === 'credits' && (
                                         <Badge className="bg-primary">Actif</Badge>
                                     )}
                                 </div>
@@ -169,165 +222,207 @@ export default function SettingsIndex({ billingMode, hasHetznerToken, creditBala
                             {/* BYOK Mode */}
                             <div
                                 className={`relative flex cursor-pointer rounded-xl border-2 p-5 transition-all ${
-                                    billingMode === 'byok'
+                                    llmBillingMode === 'byok'
                                         ? 'border-green-500 bg-green-50'
                                         : 'border-gray-200 hover:border-gray-300'
-                                }`}
+                                } ${!hasAnyApiKey ? 'opacity-60' : ''}`}
                                 onClick={() => handleBillingModeChange('byok')}
                             >
                                 <div className="flex w-full items-start justify-between">
                                     <div className="flex items-start gap-4">
                                         <div className={`p-3 rounded-full ${
-                                            billingMode === 'byok' ? 'bg-green-600 text-white' : 'bg-gray-100'
+                                            llmBillingMode === 'byok' ? 'bg-green-600 text-white' : 'bg-gray-100'
                                         }`}>
                                             <Key className="h-6 w-6" />
                                         </div>
                                         <div>
                                             <p className="font-semibold text-lg">
-                                                BYOK - Votre compte Hetzner
+                                                BYOK - Vos propres clés API
                                             </p>
                                             <p className="text-muted-foreground mt-1">
-                                                Utilisez votre propre compte Hetzner. 
-                                                Vous payez directement Hetzner aux prix coûtant.
+                                                Utilisez vos propres clés API Anthropic ou OpenAI.
                                             </p>
                                             <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
                                                 <li className="flex items-center gap-2">
                                                     <Check className="h-4 w-4 text-green-500" />
-                                                    Prix Hetzner direct (moins cher)
+                                                    Payez directement aux tarifs officiels
                                                 </li>
                                                 <li className="flex items-center gap-2">
                                                     <Check className="h-4 w-4 text-green-500" />
-                                                    Contrôle total sur votre infrastructure
+                                                    Contrôle total sur vos limites d'usage
                                                 </li>
                                                 <li className="flex items-center gap-2">
                                                     <Check className="h-4 w-4 text-green-500" />
-                                                    Gratuit côté CloudClaw
+                                                    Pas de frais CloudClaw pour l'IA
                                                 </li>
                                             </ul>
                                         </div>
                                     </div>
-                                    {billingMode === 'byok' && (
+                                    {llmBillingMode === 'byok' && (
                                         <Badge className="bg-green-600">Actif</Badge>
                                     )}
                                 </div>
                             </div>
-
-                            {/* Current balance info for credits mode */}
-                            {billingMode === 'credits' && (
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <p className="font-medium">Solde actuel</p>
-                                        <p className="text-2xl font-bold text-primary">€{Number(creditBalance).toFixed(2)}</p>
-                                    </div>
-                                    <Link href={route('credits.index')}>
-                                        <Button>
-                                            <CreditCard className="mr-2 h-4 w-4" />
-                                            Recharger
-                                        </Button>
-                                    </Link>
-                                </div>
-                            )}
                         </CardContent>
                     </Card>
 
-                    {/* Hetzner Token Configuration */}
-                    {(showTokenForm || billingMode === 'byok') && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Shield className="h-5 w-5" />
-                                    Token Hetzner API
-                                </CardTitle>
-                                <CardDescription>
-                                    Votre token est chiffré et stocké de manière sécurisée
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {hasHetznerToken ? (
-                                    <div className="space-y-4">
-                                        <Alert className="border-green-200 bg-green-50">
-                                            <Check className="h-4 w-4 text-green-600" />
-                                            <AlertDescription className="text-green-700">
-                                                Token Hetzner configuré et validé
-                                            </AlertDescription>
-                                        </Alert>
-                                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                            <div>
-                                                <p className="font-medium">Token actif</p>
-                                                <p className="text-sm text-muted-foreground">
-                                                    ••••••••••••••••
-                                                </p>
-                                            </div>
-                                            <Button variant="destructive" size="sm" onClick={handleRemoveToken}>
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                Supprimer
-                                            </Button>
+                    {/* API Keys Configuration */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Key className="h-5 w-5" />
+                                Clés API
+                            </CardTitle>
+                            <CardDescription>
+                                Configurez vos clés API pour le mode BYOK
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* Anthropic API Key */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                                            <span className="text-orange-600 font-bold text-sm">A</span>
+                                        </div>
+                                        <div>
+                                            <p className="font-medium">Anthropic (Claude)</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {hasAnthropicKey ? 'Clé configurée ✓' : 'Non configurée'}
+                                            </p>
                                         </div>
                                     </div>
-                                ) : (
-                                    <form onSubmit={handleTokenSubmit} className="space-y-4">
+                                    {hasAnthropicKey ? (
+                                        <div className="flex gap-2">
+                                            <Badge variant="outline" className="bg-green-50 text-green-700">Actif</Badge>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm"
+                                                onClick={() => handleRemoveKey('anthropic')}
+                                            >
+                                                <Trash2 className="h-4 w-4 text-red-500" />
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={() => setShowAnthropicForm(!showAnthropicForm)}
+                                        >
+                                            {showAnthropicForm ? 'Annuler' : 'Ajouter'}
+                                        </Button>
+                                    )}
+                                </div>
+
+                                {showAnthropicForm && (
+                                    <form onSubmit={(e) => handleApiKeySubmit(e, 'anthropic')} className="space-y-3 p-4 bg-gray-50 rounded-lg">
                                         <div className="space-y-2">
-                                            <Label htmlFor="hetzner_token">Token API Hetzner</Label>
+                                            <Label htmlFor="anthropic_key">Clé API Anthropic</Label>
                                             <Input
-                                                id="hetzner_token"
+                                                id="anthropic_key"
                                                 type="password"
-                                                value={tokenForm.data.hetzner_token}
-                                                onChange={(e) => tokenForm.setData('hetzner_token', e.target.value)}
-                                                placeholder="Entrez votre token API Hetzner"
+                                                value={anthropicForm.data.api_key}
+                                                onChange={(e) => anthropicForm.setData('api_key', e.target.value)}
+                                                placeholder="sk-ant-..."
                                                 className="font-mono"
                                             />
-                                            {tokenForm.errors.hetzner_token && (
-                                                <p className="text-sm text-red-500">{tokenForm.errors.hetzner_token}</p>
+                                            {anthropicForm.errors.api_key && (
+                                                <p className="text-sm text-red-500">{anthropicForm.errors.api_key}</p>
                                             )}
                                         </div>
-
-                                        <Alert>
-                                            <HelpCircle className="h-4 w-4" />
-                                            <AlertDescription>
-                                                <p className="mb-2">Pour obtenir votre token Hetzner :</p>
-                                                <ol className="list-decimal list-inside space-y-1 text-sm">
-                                                    <li>Connectez-vous à <a href="https://console.hetzner.cloud" target="_blank" rel="noopener noreferrer" className="text-primary underline">console.hetzner.cloud</a></li>
-                                                    <li>Créez un projet ou sélectionnez-en un</li>
-                                                    <li>Allez dans Security → API Tokens</li>
-                                                    <li>Générez un token avec les permissions "Read & Write"</li>
-                                                </ol>
-                                            </AlertDescription>
-                                        </Alert>
-
-                                        <div className="flex gap-3">
-                                            {showTokenForm && billingMode !== 'byok' && (
-                                                <Button 
-                                                    type="button" 
-                                                    variant="outline" 
-                                                    onClick={() => setShowTokenForm(false)}
-                                                    className="flex-1"
-                                                >
-                                                    Annuler
-                                                </Button>
-                                            )}
-                                            <Button 
-                                                type="submit" 
-                                                disabled={tokenForm.processing || !tokenForm.data.hetzner_token}
-                                                className="flex-1"
-                                            >
-                                                {tokenForm.processing ? 'Validation...' : 'Valider le token'}
+                                        <div className="flex gap-2">
+                                            <Button type="submit" disabled={anthropicForm.processing || !anthropicForm.data.api_key}>
+                                                {anthropicForm.processing ? 'Validation...' : 'Enregistrer'}
                                             </Button>
+                                            <a 
+                                                href="https://console.anthropic.com/settings/keys" 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                            >
+                                                <Button type="button" variant="link">
+                                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                                    Obtenir une clé
+                                                </Button>
+                                            </a>
                                         </div>
                                     </form>
                                 )}
+                            </div>
 
-                                <a 
-                                    href="https://console.hetzner.cloud" 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-sm text-primary hover:underline"
-                                >
-                                    <ExternalLink className="h-4 w-4" />
-                                    Ouvrir la console Hetzner
-                                </a>
-                            </CardContent>
-                        </Card>
-                    )}
+                            <hr />
+
+                            {/* OpenAI API Key */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                            <span className="text-emerald-600 font-bold text-sm">O</span>
+                                        </div>
+                                        <div>
+                                            <p className="font-medium">OpenAI (GPT)</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {hasOpenaiKey ? 'Clé configurée ✓' : 'Non configurée'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {hasOpenaiKey ? (
+                                        <div className="flex gap-2">
+                                            <Badge variant="outline" className="bg-green-50 text-green-700">Actif</Badge>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm"
+                                                onClick={() => handleRemoveKey('openai')}
+                                            >
+                                                <Trash2 className="h-4 w-4 text-red-500" />
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={() => setShowOpenaiForm(!showOpenaiForm)}
+                                        >
+                                            {showOpenaiForm ? 'Annuler' : 'Ajouter'}
+                                        </Button>
+                                    )}
+                                </div>
+
+                                {showOpenaiForm && (
+                                    <form onSubmit={(e) => handleApiKeySubmit(e, 'openai')} className="space-y-3 p-4 bg-gray-50 rounded-lg">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="openai_key">Clé API OpenAI</Label>
+                                            <Input
+                                                id="openai_key"
+                                                type="password"
+                                                value={openaiForm.data.api_key}
+                                                onChange={(e) => openaiForm.setData('api_key', e.target.value)}
+                                                placeholder="sk-..."
+                                                className="font-mono"
+                                            />
+                                            {openaiForm.errors.api_key && (
+                                                <p className="text-sm text-red-500">{openaiForm.errors.api_key}</p>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button type="submit" disabled={openaiForm.processing || !openaiForm.data.api_key}>
+                                                {openaiForm.processing ? 'Validation...' : 'Enregistrer'}
+                                            </Button>
+                                            <a 
+                                                href="https://platform.openai.com/api-keys" 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                            >
+                                                <Button type="button" variant="link">
+                                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                                    Obtenir une clé
+                                                </Button>
+                                            </a>
+                                        </div>
+                                    </form>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     {/* Help Card */}
                     <Card>
@@ -343,13 +438,13 @@ export default function SettingsIndex({ billingMode, hasHetznerToken, creditBala
                                     <p className="font-medium">Quelle option choisir ?</p>
                                     <p className="text-muted-foreground">
                                         <strong>Crédits CloudClaw</strong> si vous voulez la simplicité. 
-                                        <strong>BYOK</strong> si vous voulez économiser et avez un compte Hetzner.
+                                        <strong> BYOK</strong> si vous avez déjà un compte Anthropic/OpenAI et voulez utiliser vos propres tarifs.
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="font-medium">Puis-je changer de mode ?</p>
+                                    <p className="font-medium">Mes clés sont-elles sécurisées ?</p>
                                     <p className="text-muted-foreground">
-                                        Oui, à tout moment. Les assistants existants gardent leur mode de facturation initial.
+                                        Oui, vos clés API sont chiffrées avant d'être stockées et ne sont jamais visibles en clair.
                                     </p>
                                 </div>
                             </div>

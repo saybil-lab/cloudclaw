@@ -26,7 +26,6 @@ class ServerController extends Controller
         return Inertia::render('Assistants/Index', [
             'assistants' => $servers,
             'serverTypes' => $this->provisioningService->getAvailableServerTypes(),
-            'billingMode' => $request->user()->billing_mode,
         ]);
     }
 
@@ -42,9 +41,7 @@ class ServerController extends Controller
                 ['id' => 'hel1', 'name' => 'Finlande (Helsinki)', 'flag' => '🇫🇮'],
                 ['id' => 'ash', 'name' => 'États-Unis (Ashburn)', 'flag' => '🇺🇸'],
             ],
-            'billingMode' => $user->billing_mode,
-            'hasByokConfigured' => $user->hasByokConfigured(),
-            'creditBalance' => $user->isCreditsMode() ? $user->getOrCreateCredit()->balance : null,
+            'creditBalance' => $user->getOrCreateCredit()->balance,
         ]);
     }
 

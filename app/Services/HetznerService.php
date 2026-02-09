@@ -12,17 +12,9 @@ class HetznerService
     protected string $apiToken;
     protected string $baseUrl = 'https://api.hetzner.cloud/v1';
 
-    public function __construct(?string $customToken = null)
+    public function __construct()
     {
-        $this->apiToken = $customToken ?? config('services.hetzner.token', '');
-    }
-
-    /**
-     * Create a new instance with a custom token (for BYOK users)
-     */
-    public static function withToken(string $token): self
-    {
-        return new self($token);
+        $this->apiToken = config('services.hetzner.token', '');
     }
 
     protected function request(): \Illuminate\Http\Client\PendingRequest
@@ -39,23 +31,6 @@ class HetznerService
     protected function isMockMode(): bool
     {
         return config('services.hetzner.mock', false) || empty($this->apiToken);
-    }
-
-    /**
-     * Validate a Hetzner API token
-     */
-    public function validateToken(): bool
-    {
-        if ($this->isMockMode()) {
-            return true;
-        }
-
-        try {
-            $response = $this->request()->get('/locations');
-            return $response->successful();
-        } catch (\Exception $e) {
-            return false;
-        }
     }
 
     /**
@@ -261,93 +236,6 @@ class HetznerService
     }
 
     /**
-     * List available server types
-     */
-    public function getServerTypes(): array
-    {
-        if ($this->isMockMode()) {
-            return $this->getMockServerTypes();
-        }
-
-        $response = $this->request()->get('/server_types');
-
-        if ($response->failed()) {
-            return $this->getMockServerTypes();
-        }
-
-        return $response->json('server_types', []);
-    }
-
-    /**
-     * List available locations
-     */
-    public function getLocations(): array
-    {
-        if ($this->isMockMode()) {
-            return $this->getMockLocations();
-        }
-
-        $response = $this->request()->get('/locations');
-
-        if ($response->failed()) {
-            return $this->getMockLocations();
-        }
-
-        return $response->json('locations', []);
-    }
-
-    /**
-     * List available images
-     */
-    public function getImages(string $type = 'system'): array
-    {
-        if ($this->isMockMode()) {
-            return [];
-        }
-
-        $response = $this->request()->get('/images', ['type' => $type]);
-
-        if ($response->failed()) {
-            return [];
-        }
-
-        return $response->json('images', []);
-    }
-
-    /**
-     * Create or get SSH key
-     */
-    public function ensureSshKey(string $name, string $publicKey): ?array
-    {
-        if ($this->isMockMode()) {
-            return ['id' => 'mock-key-id', 'name' => $name];
-        }
-
-        // First check if key exists
-        $response = $this->request()->get('/ssh_keys', ['name' => $name]);
-        
-        if ($response->successful()) {
-            $keys = $response->json('ssh_keys', []);
-            if (!empty($keys)) {
-                return $keys[0];
-            }
-        }
-
-        // Create new key
-        $response = $this->request()->post('/ssh_keys', [
-            'name' => $name,
-            'public_key' => $publicKey,
-        ]);
-
-        if ($response->failed()) {
-            Log::error('Failed to create SSH key', ['name' => $name, 'error' => $response->json()]);
-            return null;
-        }
-
-        return $response->json('ssh_key');
-    }
-
-    /**
      * Get cloud-init script for initial server setup
      */
     protected function getCloudInitScript(): string
@@ -428,25 +316,6 @@ CLOUD_INIT;
                 'memory' => 4,
                 'disk' => 40,
             ],
-        ];
-    }
-
-    protected function getMockServerTypes(): array
-    {
-        return [
-            ['name' => 'cx22', 'description' => '2 vCPU, 4GB RAM, 40GB SSD', 'cores' => 2, 'memory' => 4, 'disk' => 40, 'prices' => [['price_hourly' => ['gross' => '0.0065']]]],
-            ['name' => 'cx32', 'description' => '4 vCPU, 8GB RAM, 80GB SSD', 'cores' => 4, 'memory' => 8, 'disk' => 80, 'prices' => [['price_hourly' => ['gross' => '0.013']]]],
-            ['name' => 'cx42', 'description' => '8 vCPU, 16GB RAM, 160GB SSD', 'cores' => 8, 'memory' => 16, 'disk' => 160, 'prices' => [['price_hourly' => ['gross' => '0.026']]]],
-        ];
-    }
-
-    protected function getMockLocations(): array
-    {
-        return [
-            ['name' => 'fsn1', 'description' => 'Falkenstein, Germany', 'city' => 'Falkenstein', 'country' => 'DE'],
-            ['name' => 'nbg1', 'description' => 'Nuremberg, Germany', 'city' => 'Nuremberg', 'country' => 'DE'],
-            ['name' => 'hel1', 'description' => 'Helsinki, Finland', 'city' => 'Helsinki', 'country' => 'FI'],
-            ['name' => 'ash', 'description' => 'Ashburn, USA', 'city' => 'Ashburn', 'country' => 'US'],
         ];
     }
 
