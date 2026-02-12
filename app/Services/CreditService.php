@@ -300,4 +300,96 @@ class CreditService
             ['amount' => 100, 'label' => '€100', 'bonus' => 10],
         ];
     }
+
+    /**
+     * Create a Stripe Checkout Session for subscription ($199/month)
+     */
+    public function createSubscriptionCheckout(User $user): string
+    {
+        $successUrl = route('onboarding.success') . '?session_id={CHECKOUT_SESSION_ID}';
+        $cancelUrl = route('onboarding');
+
+        if ($this->isMockMode()) {
+            // Mock response for development - redirect to success with mock parameter
+            return route('onboarding.success') . '?mock=true';
+        }
+
+        // Ensure user has a Stripe customer
+        $customerId = $this->getOrCreateStripeCustomer($user);
+
+        try {
+            // First, create or get the price for the subscription
+            $price = $this->getOrCreateSubscriptionPrice();
+
+            $session = $this->stripe->checkout->sessions->create([
+                'customer' => $customerId,
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'price' => $price->id,
+                    'quantity' => 1,
+                ]],
+                'mode' => 'subscription',
+                'success_url' => $successUrl,
+                'cancel_url' => $cancelUrl,
+                'metadata' => [
+                    'user_id' => $user->id,
+                    'type' => 'subscription',
+                ],
+                'subscription_data' => [
+                    'metadata' => [
+                        'user_id' => $user->id,
+                    ],
+                ],
+            ]);
+
+            Log::info('Stripe Subscription Checkout session created', [
+                'session_id' => $session->id,
+                'user_id' => $user->id,
+            ]);
+
+            return $session->url;
+
+        } catch (\Exception $e) {
+            Log::error('Failed to create Stripe Subscription Checkout session', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Get or create the subscription price in Stripe
+     */
+    protected function getOrCreateSubscriptionPrice(): \Stripe\Price
+    {
+        // Check if we have a price ID in config
+        $priceId = config('services.stripe.subscription_price_id');
+
+        if ($priceId) {
+            return $this->stripe->prices->retrieve($priceId);
+        }
+
+        // Create a product and price for the subscription
+        $product = $this->stripe->products->create([
+            'name' => 'ClawdClaw Pro',
+            'description' => 'Your personal AI assistant - $199/month',
+        ]);
+
+        $price = $this->stripe->prices->create([
+            'product' => $product->id,
+            'unit_amount' => 19900, // $199 in cents
+            'currency' => 'usd',
+            'recurring' => [
+                'interval' => 'month',
+            ],
+        ]);
+
+        Log::info('Created Stripe subscription price', [
+            'price_id' => $price->id,
+            'product_id' => $product->id,
+        ]);
+
+        return $price;
+    }
 }

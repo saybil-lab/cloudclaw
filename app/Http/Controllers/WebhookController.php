@@ -102,6 +102,7 @@ class WebhookController extends Controller
             // Extract metadata
             $metadata = is_object($session) ? ($session->metadata ?? new \stdClass()) : ($session['metadata'] ?? []);
             $userId = is_object($metadata) ? ($metadata->user_id ?? null) : ($metadata['user_id'] ?? null);
+            $type = is_object($metadata) ? ($metadata->type ?? null) : ($metadata['type'] ?? null);
             $creditAmount = is_object($metadata) ? ($metadata->credit_amount ?? null) : ($metadata['credit_amount'] ?? null);
 
             if (!$userId) {
@@ -117,7 +118,29 @@ class WebhookController extends Controller
                 return response()->json(['error' => 'User not found'], 404);
             }
 
-            // Get amount from session
+            // Handle subscription checkout
+            if ($type === 'subscription') {
+                $subscriptionId = is_object($session)
+                    ? ($session->subscription ?? null)
+                    : ($session['subscription'] ?? null);
+
+                $user->update([
+                    'onboarding_completed' => true,
+                    'subscription_status' => 'active',
+                ]);
+
+                Log::info('Subscription activated from checkout session', [
+                    'user_id' => $user->id,
+                    'subscription_id' => $subscriptionId,
+                ]);
+
+                return response()->json([
+                    'status' => 'success',
+                    'subscription_activated' => true,
+                ]);
+            }
+
+            // Handle credit purchase checkout
             $amountTotal = is_object($session) ? ($session->amount_total ?? 0) : ($session['amount_total'] ?? 0);
             $amount = $creditAmount ?? ($amountTotal / 100); // Convert from cents if not in metadata
 
@@ -127,8 +150,8 @@ class WebhookController extends Controller
             }
 
             // Get payment intent ID for reference
-            $paymentIntentId = is_object($session) 
-                ? ($session->payment_intent ?? null) 
+            $paymentIntentId = is_object($session)
+                ? ($session->payment_intent ?? null)
                 : ($session['payment_intent'] ?? null);
 
             // Add credits to user account
@@ -241,13 +264,50 @@ class WebhookController extends Controller
      */
     protected function handleSubscriptionEvent($subscription)
     {
+        $subscriptionId = is_object($subscription) ? $subscription->id : $subscription['id'];
+        $status = is_object($subscription) ? $subscription->status : $subscription['status'];
+        $metadata = is_object($subscription) ? ($subscription->metadata ?? new \stdClass()) : ($subscription['metadata'] ?? []);
+        $userId = is_object($metadata) ? ($metadata->user_id ?? null) : ($metadata['user_id'] ?? null);
+
         Log::info('Subscription event received', [
-            'subscription_id' => $subscription->id ?? $subscription['id'],
-            'status' => $subscription->status ?? $subscription['status'],
+            'subscription_id' => $subscriptionId,
+            'status' => $status,
+            'user_id' => $userId,
         ]);
 
-        // TODO: Implement subscription handling if needed
-        return response()->json(['status' => 'logged']);
+        if (!$userId) {
+            // Try to find user by customer ID
+            $customerId = is_object($subscription) ? $subscription->customer : $subscription['customer'];
+            $user = User::where('stripe_customer_id', $customerId)->first();
+        } else {
+            $user = User::find($userId);
+        }
+
+        if (!$user) {
+            Log::warning('User not found for subscription event', [
+                'subscription_id' => $subscriptionId,
+            ]);
+            return response()->json(['status' => 'user_not_found']);
+        }
+
+        // Map Stripe status to our status
+        $mappedStatus = match($status) {
+            'active', 'trialing' => 'active',
+            'past_due' => 'past_due',
+            'canceled', 'unpaid' => 'canceled',
+            default => $status,
+        };
+
+        $user->update([
+            'subscription_status' => $mappedStatus,
+        ]);
+
+        Log::info('User subscription status updated', [
+            'user_id' => $user->id,
+            'status' => $mappedStatus,
+        ]);
+
+        return response()->json(['status' => 'success']);
     }
 
     /**
@@ -255,12 +315,31 @@ class WebhookController extends Controller
      */
     protected function handleSubscriptionDeleted($subscription)
     {
+        $subscriptionId = is_object($subscription) ? $subscription->id : $subscription['id'];
+        $metadata = is_object($subscription) ? ($subscription->metadata ?? new \stdClass()) : ($subscription['metadata'] ?? []);
+        $userId = is_object($metadata) ? ($metadata->user_id ?? null) : ($metadata['user_id'] ?? null);
+
         Log::info('Subscription deleted', [
-            'subscription_id' => $subscription->id ?? $subscription['id'],
+            'subscription_id' => $subscriptionId,
+            'user_id' => $userId,
         ]);
 
-        // TODO: Implement subscription cancellation handling
-        return response()->json(['status' => 'logged']);
+        if (!$userId) {
+            $customerId = is_object($subscription) ? $subscription->customer : $subscription['customer'];
+            $user = User::where('stripe_customer_id', $customerId)->first();
+        } else {
+            $user = User::find($userId);
+        }
+
+        if ($user) {
+            $user->update([
+                'subscription_status' => 'canceled',
+            ]);
+
+            Log::info('User subscription canceled', ['user_id' => $user->id]);
+        }
+
+        return response()->json(['status' => 'success']);
     }
 
     /**
@@ -268,12 +347,25 @@ class WebhookController extends Controller
      */
     protected function handleInvoicePaid($invoice)
     {
+        $invoiceId = is_object($invoice) ? $invoice->id : $invoice['id'];
+        $customerId = is_object($invoice) ? $invoice->customer : $invoice['customer'];
+        $subscriptionId = is_object($invoice) ? ($invoice->subscription ?? null) : ($invoice['subscription'] ?? null);
+
         Log::info('Invoice paid', [
-            'invoice_id' => $invoice->id ?? $invoice['id'],
+            'invoice_id' => $invoiceId,
+            'subscription_id' => $subscriptionId,
         ]);
 
-        // TODO: Handle recurring payments if subscriptions are implemented
-        return response()->json(['status' => 'logged']);
+        // If this is a subscription invoice, ensure user is active
+        if ($subscriptionId) {
+            $user = User::where('stripe_customer_id', $customerId)->first();
+            if ($user && $user->subscription_status !== 'active') {
+                $user->update(['subscription_status' => 'active']);
+                Log::info('User subscription reactivated from invoice payment', ['user_id' => $user->id]);
+            }
+        }
+
+        return response()->json(['status' => 'success']);
     }
 
     /**
@@ -281,11 +373,19 @@ class WebhookController extends Controller
      */
     protected function handleInvoicePaymentFailed($invoice)
     {
+        $invoiceId = is_object($invoice) ? $invoice->id : $invoice['id'];
+        $customerId = is_object($invoice) ? $invoice->customer : $invoice['customer'];
+
         Log::warning('Invoice payment failed', [
-            'invoice_id' => $invoice->id ?? $invoice['id'],
+            'invoice_id' => $invoiceId,
         ]);
 
-        // TODO: Notify user about failed payment
+        $user = User::where('stripe_customer_id', $customerId)->first();
+        if ($user) {
+            $user->update(['subscription_status' => 'past_due']);
+            Log::info('User subscription marked as past_due', ['user_id' => $user->id]);
+        }
+
         return response()->json(['status' => 'logged']);
     }
 }

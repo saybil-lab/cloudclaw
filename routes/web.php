@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AdminServerController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\CreditController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ServerController;
 use App\Http\Controllers\SettingsController;
@@ -20,6 +21,13 @@ Route::get('/', function () {
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
     ]);
+});
+
+// Onboarding routes (auth required but not verified)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding');
+    Route::post('/onboarding/complete', [OnboardingController::class, 'complete'])->name('onboarding.complete');
+    Route::get('/onboarding/success', [OnboardingController::class, 'success'])->name('onboarding.success');
 });
 
 // Authenticated routes

@@ -30,6 +30,11 @@ class User extends Authenticatable
         'anthropic_api_key',
         'openai_api_key',
         'llm_credits',
+        'use_case',
+        'team_size',
+        'priority',
+        'onboarding_completed',
+        'subscription_status',
     ];
 
     /**
@@ -56,6 +61,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'llm_credits' => 'decimal:2',
+            'onboarding_completed' => 'boolean',
         ];
     }
 
