@@ -17,8 +17,8 @@ class ServerController extends Controller
 
     public function index(Request $request)
     {
-        $servers = $request->user()
-            ->servers()
+        $user = $request->user();
+        $servers = $user->servers()
             ->whereNotIn('status', ['deleted'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -26,13 +26,14 @@ class ServerController extends Controller
         return Inertia::render('Assistants/Index', [
             'assistants' => $servers,
             'serverTypes' => $this->provisioningService->getAvailableServerTypes(),
+            'hasActiveSubscription' => $user->hasActiveSubscription(),
         ]);
     }
 
     public function create(Request $request)
     {
         $user = $request->user();
-        
+
         return Inertia::render('Assistants/Create', [
             'serverTypes' => $this->provisioningService->getAvailableServerTypes(),
             'locations' => [
@@ -42,6 +43,7 @@ class ServerController extends Controller
                 ['id' => 'ash', 'name' => 'États-Unis (Ashburn)', 'flag' => '🇺🇸'],
             ],
             'creditBalance' => $user->getOrCreateCredit()->balance,
+            'hasActiveSubscription' => $user->hasActiveSubscription(),
         ]);
     }
 
@@ -70,8 +72,10 @@ class ServerController extends Controller
 
     public function show(Request $request, Server $server)
     {
+        $user = $request->user();
+
         // Ensure user owns this server
-        if ($server->user_id !== $request->user()->id) {
+        if ($server->user_id !== $user->id) {
             abort(403);
         }
 
@@ -82,6 +86,7 @@ class ServerController extends Controller
 
         return Inertia::render('Assistants/Show', [
             'assistant' => $serverData,
+            'hasActiveSubscription' => $user->hasActiveSubscription(),
         ]);
     }
 

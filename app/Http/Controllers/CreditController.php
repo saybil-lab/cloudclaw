@@ -24,6 +24,7 @@ class CreditController extends Controller
             'packages' => $this->creditService->getCreditPackages(),
             'stripeKey' => config('services.stripe.key'),
             'mockMode' => $this->creditService->isMockMode(),
+            'hasActiveSubscription' => $user->hasActiveSubscription(),
         ]);
     }
 

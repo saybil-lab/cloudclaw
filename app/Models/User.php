@@ -158,4 +158,20 @@ class User extends Authenticatable
             default => null,
         };
     }
+
+    /**
+     * Check if user has an active subscription
+     */
+    public function hasActiveSubscription(): bool
+    {
+        return $this->subscription_status === 'active';
+    }
+
+    /**
+     * Check if user is on trial
+     */
+    public function isOnTrial(): bool
+    {
+        return $this->subscription_status === 'trial';
+    }
 }

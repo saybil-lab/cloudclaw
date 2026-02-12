@@ -11,13 +11,14 @@ class SettingsController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        
+
         return Inertia::render('Settings/Index', [
             'llmBillingMode' => $user->llm_billing_mode,
             'hasAnthropicKey' => !empty($user->anthropic_api_key),
             'hasOpenaiKey' => !empty($user->openai_api_key),
             'llmCredits' => (float) $user->llm_credits,
             'serverCredits' => (float) $user->getOrCreateCredit()->balance,
+            'hasActiveSubscription' => $user->hasActiveSubscription(),
         ]);
     }
 

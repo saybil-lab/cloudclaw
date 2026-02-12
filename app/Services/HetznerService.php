@@ -14,7 +14,7 @@ class HetznerService
 
     public function __construct()
     {
-        $this->apiToken = config('services.hetzner.token', '');
+        $this->apiToken = config('services.hetzner.token') ?? '';
     }
 
     protected function request(): \Illuminate\Http\Client\PendingRequest

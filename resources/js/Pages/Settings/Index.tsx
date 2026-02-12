@@ -1,13 +1,15 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm, usePage, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { 
-    Settings, CreditCard, Key, Check, AlertCircle, 
+import React from 'react';
+import DashboardLayout from '@/Layouts/DashboardLayout';
+import { useForm, usePage, Link, router } from '@inertiajs/react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
+import { Button } from '@/Components/ui/button';
+import { Input } from '@/Components/ui/input';
+import { Label } from '@/Components/ui/label';
+import { Alert, AlertDescription } from '@/Components/ui/alert';
+import { Badge } from '@/Components/ui/badge';
+import { SubscriptionCTA } from '@/Components/SubscriptionCTA';
+import {
+    Settings, CreditCard, Key, Check, AlertCircle,
     ExternalLink, Wallet, HelpCircle, Trash2,
     Brain, Sparkles, Zap
 } from 'lucide-react';
@@ -19,6 +21,7 @@ interface Props {
     hasOpenaiKey: boolean;
     llmCredits: number;
     serverCredits: number;
+    hasActiveSubscription: boolean;
 }
 
 interface Flash {
@@ -26,14 +29,19 @@ interface Flash {
     error?: string;
 }
 
-export default function SettingsIndex({ 
-    llmBillingMode, 
-    hasAnthropicKey, 
-    hasOpenaiKey, 
+function SettingsIndex({
+    llmBillingMode,
+    hasAnthropicKey,
+    hasOpenaiKey,
     llmCredits,
-    serverCredits 
+    serverCredits,
+    hasActiveSubscription
 }: Props) {
     const { flash } = usePage().props as { flash?: Flash };
+
+    if (!hasActiveSubscription) {
+        return <SubscriptionCTA />;
+    }
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [showApiKeyForm, setShowApiKeyForm] = useState<'anthropic' | 'openai' | null>(null);
 
@@ -95,27 +103,18 @@ export default function SettingsIndex({
     };
 
     return (
-        <AuthenticatedLayout
-            header={
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                        <Settings className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                            Paramètres
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                            Configurez vos API LLM et votre mode de facturation
-                        </p>
-                    </div>
+        <>
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+                    <p className="text-muted-foreground">
+                        Configure your LLM APIs and billing mode
+                    </p>
                 </div>
-            }
-        >
-            <Head title="Paramètres" />
+            </div>
 
-            <div className="py-8">
-                <div className="mx-auto max-w-3xl sm:px-6 lg:px-8 space-y-6">
+            <div className="mx-auto max-w-3xl space-y-6">
                     {/* Flash Messages */}
                     {message && (
                         <Alert className={message.type === 'success' ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}>
@@ -516,7 +515,10 @@ export default function SettingsIndex({
                         </CardContent>
                     </Card>
                 </div>
-            </div>
-        </AuthenticatedLayout>
+        </>
     );
 }
+
+SettingsIndex.layout = (page: React.ReactNode) => <DashboardLayout title="Settings">{page}</DashboardLayout>
+
+export default SettingsIndex;

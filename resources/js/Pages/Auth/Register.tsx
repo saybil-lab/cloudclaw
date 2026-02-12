@@ -1,10 +1,21 @@
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
-import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
+import { Button } from '@/Components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/Components/ui/card';
+import {
+    Field,
+    FieldDescription,
+    FieldError,
+    FieldGroup,
+    FieldLabel,
+} from '@/Components/ui/field';
+import { Input } from '@/Components/ui/input';
 
 export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -23,99 +34,106 @@ export default function Register() {
     };
 
     return (
-        <GuestLayout>
-            <Head title="Register" />
-
-            <form onSubmit={submit}>
-                <div>
-                    <InputLabel htmlFor="name" value="Name" />
-
-                    <TextInput
-                        id="name"
-                        name="name"
-                        value={data.name}
-                        className="mt-1 block w-full"
-                        autoComplete="name"
-                        isFocused={true}
-                        onChange={(e) => setData('name', e.target.value)}
-                        required
-                    />
-
-                    <InputError message={errors.name} className="mt-2" />
+        <>
+            <Head title="Create Account" />
+            <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-6">
+                <div className="mb-8 flex items-center gap-2">
+                    <img src="/images/logo.avif" alt="ClawdClaw" className="h-10 w-10 rounded-full object-cover" />
+                    <span className="text-2xl font-light tracking-wide">ClawdClaw</span>
                 </div>
 
-                <div className="mt-4">
-                    <InputLabel htmlFor="email" value="Email" />
+                <div className="w-full max-w-md">
+                    <Card>
+                        <CardHeader className="text-center">
+                            <CardTitle className="text-2xl">Create your account</CardTitle>
+                            <CardDescription>
+                                Enter your information below to get started
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <form onSubmit={submit}>
+                                <FieldGroup>
+                                    <Field>
+                                        <FieldLabel htmlFor="name">Full Name</FieldLabel>
+                                        <Input
+                                            id="name"
+                                            type="text"
+                                            placeholder="John Doe"
+                                            value={data.name}
+                                            onChange={(e) => setData('name', e.target.value)}
+                                            autoComplete="name"
+                                            autoFocus
+                                            required
+                                        />
+                                        {errors.name && <FieldError>{errors.name}</FieldError>}
+                                    </Field>
 
-                    <TextInput
-                        id="email"
-                        type="email"
-                        name="email"
-                        value={data.email}
-                        className="mt-1 block w-full"
-                        autoComplete="username"
-                        onChange={(e) => setData('email', e.target.value)}
-                        required
-                    />
+                                    <Field>
+                                        <FieldLabel htmlFor="email">Email</FieldLabel>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            placeholder="you@example.com"
+                                            value={data.email}
+                                            onChange={(e) => setData('email', e.target.value)}
+                                            autoComplete="email"
+                                            required
+                                        />
+                                        {errors.email && <FieldError>{errors.email}</FieldError>}
+                                    </Field>
 
-                    <InputError message={errors.email} className="mt-2" />
+                                    <Field>
+                                        <FieldLabel htmlFor="password">Password</FieldLabel>
+                                        <Input
+                                            id="password"
+                                            type="password"
+                                            value={data.password}
+                                            onChange={(e) => setData('password', e.target.value)}
+                                            autoComplete="new-password"
+                                            required
+                                        />
+                                        <FieldDescription>
+                                            Must be at least 8 characters long
+                                        </FieldDescription>
+                                        {errors.password && <FieldError>{errors.password}</FieldError>}
+                                    </Field>
+
+                                    <Field>
+                                        <FieldLabel htmlFor="password_confirmation">Confirm Password</FieldLabel>
+                                        <Input
+                                            id="password_confirmation"
+                                            type="password"
+                                            value={data.password_confirmation}
+                                            onChange={(e) => setData('password_confirmation', e.target.value)}
+                                            autoComplete="new-password"
+                                            required
+                                        />
+                                        {errors.password_confirmation && (
+                                            <FieldError>{errors.password_confirmation}</FieldError>
+                                        )}
+                                    </Field>
+
+                                    <Field>
+                                        <Button
+                                            type="submit"
+                                            className="w-full bg-gray-900 hover:bg-gray-800 text-white"
+                                            disabled={processing}
+                                        >
+                                            {processing ? 'Creating account...' : 'Create account'}
+                                        </Button>
+                                        <FieldDescription className="text-center">
+                                            Already have an account?{' '}
+                                            <Link href={route('login')} className="font-medium text-gray-900 hover:underline">
+                                                Sign in
+                                            </Link>
+                                        </FieldDescription>
+                                    </Field>
+                                </FieldGroup>
+                            </form>
+                        </CardContent>
+                    </Card>
                 </div>
-
-                <div className="mt-4">
-                    <InputLabel htmlFor="password" value="Password" />
-
-                    <TextInput
-                        id="password"
-                        type="password"
-                        name="password"
-                        value={data.password}
-                        className="mt-1 block w-full"
-                        autoComplete="new-password"
-                        onChange={(e) => setData('password', e.target.value)}
-                        required
-                    />
-
-                    <InputError message={errors.password} className="mt-2" />
-                </div>
-
-                <div className="mt-4">
-                    <InputLabel
-                        htmlFor="password_confirmation"
-                        value="Confirm Password"
-                    />
-
-                    <TextInput
-                        id="password_confirmation"
-                        type="password"
-                        name="password_confirmation"
-                        value={data.password_confirmation}
-                        className="mt-1 block w-full"
-                        autoComplete="new-password"
-                        onChange={(e) =>
-                            setData('password_confirmation', e.target.value)
-                        }
-                        required
-                    />
-
-                    <InputError
-                        message={errors.password_confirmation}
-                        className="mt-2"
-                    />
-                </div>
-
-                <div className="mt-4 flex items-center justify-end">
-                    <Link
-                        href={route('login')}
-                        className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                    >
-                        Already registered?
-                    </Link>
-
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Register
-                    </PrimaryButton>
-                </div>
-            </form>
-        </GuestLayout>
+            </div>
+        </>
     );
 }

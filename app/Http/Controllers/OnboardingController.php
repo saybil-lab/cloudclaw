@@ -36,7 +36,7 @@ class OnboardingController extends Controller
     }
 
     /**
-     * Complete onboarding and redirect to Stripe checkout.
+     * Complete onboarding and redirect to dashboard.
      */
     public function complete(Request $request)
     {
@@ -48,20 +48,16 @@ class OnboardingController extends Controller
 
         $user = auth()->user();
 
-        // Save onboarding data
+        // Save onboarding data and mark as completed
         $user->update([
             'use_case' => $request->use_case,
             'team_size' => $request->team_size,
             'priority' => $request->priority,
+            'onboarding_completed' => true,
         ]);
 
-        // Create Stripe checkout session for subscription
-        try {
-            $checkoutUrl = $this->creditService->createSubscriptionCheckout($user);
-            return Inertia::location($checkoutUrl);
-        } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Unable to create checkout session. Please try again.']);
-        }
+        // Redirect to dashboard where they'll see the subscription CTA
+        return redirect()->route('dashboard');
     }
 
     /**
@@ -71,30 +67,23 @@ class OnboardingController extends Controller
     {
         $user = auth()->user();
         $sessionId = $request->query('session_id');
-        $isMock = $request->query('mock') === 'true';
 
-        // In mock mode, just activate the subscription
-        if ($isMock || $this->creditService->isMockMode()) {
-            $user->update([
-                'onboarding_completed' => true,
-                'subscription_status' => 'active',
-            ]);
+        // Mark onboarding as completed (subscription will be handled separately via dashboard CTA)
+        $user->update([
+            'onboarding_completed' => true,
+        ]);
 
-            return redirect()->route('dashboard')->with('success', 'Welcome to ClawdClaw! Your subscription is now active.');
-        }
-
-        // Verify the checkout session with Stripe
+        // If we have a session ID, verify it with Stripe
         if ($sessionId) {
             try {
                 $session = $this->creditService->verifyCheckoutSession($sessionId);
 
                 if ($session && $session['status'] === 'paid') {
                     $user->update([
-                        'onboarding_completed' => true,
                         'subscription_status' => 'active',
                     ]);
 
-                    return redirect()->route('dashboard')->with('success', 'Welcome to ClawdClaw! Your subscription is now active.');
+                    return redirect()->route('dashboard')->with('success', 'Welcome to Clawdclaw! Your subscription is now active.');
                 }
             } catch (\Exception $e) {
                 \Log::error('Failed to verify checkout session', [
@@ -104,8 +93,7 @@ class OnboardingController extends Controller
             }
         }
 
-        // If verification fails, still redirect but without activating subscription
-        // The webhook will handle the activation
-        return redirect()->route('dashboard')->with('info', 'Your payment is being processed. Please check back shortly.');
+        // Redirect to dashboard where they'll see the subscription CTA
+        return redirect()->route('dashboard')->with('info', 'Welcome to Clawdclaw! Subscribe to get started.');
     }
 }
