@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->boolean('is_admin')->default(false)->after('email');
-            $table->string('stripe_customer_id')->nullable()->after('is_admin');
+            if (!Schema::hasColumn('users', 'is_admin')) {
+                $table->boolean('is_admin')->default(false)->after('email');
+            }
+            if (!Schema::hasColumn('users', 'stripe_customer_id')) {
+                $table->string('stripe_customer_id')->nullable()->after('is_admin');
+            }
         });
     }
 

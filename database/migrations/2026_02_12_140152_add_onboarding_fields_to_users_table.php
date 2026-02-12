@@ -12,11 +12,21 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('use_case')->nullable();
-            $table->string('team_size')->nullable();
-            $table->string('priority')->nullable();
-            $table->boolean('onboarding_completed')->default(false);
-            $table->string('subscription_status')->nullable();
+            if (!Schema::hasColumn('users', 'use_case')) {
+                $table->string('use_case')->nullable();
+            }
+            if (!Schema::hasColumn('users', 'team_size')) {
+                $table->string('team_size')->nullable();
+            }
+            if (!Schema::hasColumn('users', 'priority')) {
+                $table->string('priority')->nullable();
+            }
+            if (!Schema::hasColumn('users', 'onboarding_completed')) {
+                $table->boolean('onboarding_completed')->default(false);
+            }
+            if (!Schema::hasColumn('users', 'subscription_status')) {
+                $table->string('subscription_status')->nullable();
+            }
         });
     }
 

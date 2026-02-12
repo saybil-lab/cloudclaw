@@ -9,8 +9,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->enum('billing_mode', ['credits', 'byok'])->default('credits')->after('email');
-            $table->text('hetzner_token')->nullable()->after('billing_mode');
+            if (!Schema::hasColumn('users', 'billing_mode')) {
+                $table->enum('billing_mode', ['credits', 'byok'])->default('credits')->after('email');
+            }
+            if (!Schema::hasColumn('users', 'hetzner_token')) {
+                $table->text('hetzner_token')->nullable()->after('billing_mode');
+            }
         });
     }
 

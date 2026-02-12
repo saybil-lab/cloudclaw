@@ -9,7 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('servers', function (Blueprint $table) {
-            $table->enum('billing_mode', ['credits', 'byok'])->default('credits')->after('user_id');
+            if (!Schema::hasColumn('servers', 'billing_mode')) {
+                $table->enum('billing_mode', ['credits', 'byok'])->default('credits')->after('user_id');
+            }
         });
     }
 
