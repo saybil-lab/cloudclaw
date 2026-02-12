@@ -20,6 +20,15 @@ export function SubscriptionCTA() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
+    const getCookie = (name: string): string => {
+        const value = `; ${document.cookie}`
+        const parts = value.split(`; ${name}=`)
+        if (parts.length === 2) {
+            return decodeURIComponent(parts.pop()?.split(';').shift() || '')
+        }
+        return ''
+    }
+
     const handleSubscribe = async () => {
         setLoading(true)
         setError(null)
@@ -29,8 +38,10 @@ export function SubscriptionCTA() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'Accept': 'application/json',
+                    'X-XSRF-TOKEN': getCookie('XSRF-TOKEN'),
                 },
+                credentials: 'same-origin',
             })
 
             const data = await response.json()
