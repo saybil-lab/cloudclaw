@@ -6,6 +6,7 @@ import { Label } from '@/Components/ui/label';
 import { PhoneInput } from '@/Components/ui/phone-input';
 import { Server, Zap, Shield, MessageCircle, ArrowRight, Menu, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import DeployAssistant from '@/Components/DeployAssistant';
 
 interface Props {
     canLogin: boolean;
@@ -121,9 +122,8 @@ function TestimonialsSection() {
                         <button
                             key={index}
                             onClick={() => setCurrentIndex(index)}
-                            className={`h-2 w-2 rounded-full transition-colors ${
-                                index === currentIndex ? 'bg-gray-900' : 'bg-gray-300'
-                            }`}
+                            className={`h-2 w-2 rounded-full transition-colors ${index === currentIndex ? 'bg-gray-900' : 'bg-gray-300'
+                                }`}
                         />
                     ))}
                 </div>
@@ -208,14 +208,8 @@ export default function Welcome({ canLogin, canRegister }: Props) {
                             Your personal AI assistant. Chat with it on Slack, Telegram,
                             WhatsApp or the web – it learns your workflows, manages tasks, and gets things done.
                         </p>
-                        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                            <Link
-                                href={route('register')}
-                                className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-gray-900 text-white shadow hover:bg-gray-800 h-10 rounded-md text-lg px-8"
-                            >
-                                Get my Assistant
-                                <ArrowRight className="ml-2 h-5 w-5" />
-                            </Link>
+                        <div className="mt-10 w-full flex justify-center">
+                            <DeployAssistant />
                         </div>
                         <p className="mt-4 text-sm text-muted-foreground">
                             No technical skills required. Cancel anytime.

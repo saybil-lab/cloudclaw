@@ -35,6 +35,8 @@ class User extends Authenticatable
         'priority',
         'onboarding_completed',
         'subscription_status',
+        'google_id',
+        'avatar',
     ];
 
     /**
