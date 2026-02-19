@@ -86,7 +86,7 @@ export function SubscriptionCTA() {
                     {/* Price */}
                     <div className="text-center">
                         <div className="flex items-baseline justify-center gap-1">
-                            <span className="text-4xl font-bold">$199</span>
+                            <span className="text-4xl font-bold">$39</span>
                             <span className="text-muted-foreground">/month</span>
                         </div>
                     </div>

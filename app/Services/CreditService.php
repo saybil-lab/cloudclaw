@@ -302,7 +302,7 @@ class CreditService
     }
 
     /**
-     * Create a Stripe Checkout Session for subscription ($199/month)
+     * Create a Stripe Checkout Session for subscription ($39/month)
      */
     public function createSubscriptionCheckout(User $user): string
     {
@@ -373,12 +373,12 @@ class CreditService
         // Create a product and price for the subscription
         $product = $this->stripe->products->create([
             'name' => 'ClawdClaw Pro',
-            'description' => 'Your personal AI assistant - $199/month',
+            'description' => 'Your personal AI assistant - $39/month',
         ]);
 
         $price = $this->stripe->prices->create([
             'product' => $product->id,
-            'unit_amount' => 19900, // $199 in cents
+            'unit_amount' => 3900, // $39 in cents
             'currency' => 'usd',
             'recurring' => [
                 'interval' => 'month',

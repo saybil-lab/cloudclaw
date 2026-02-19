@@ -284,7 +284,7 @@ export default function Welcome({ canLogin, canRegister }: Props) {
                                 <CardDescription>Everything you need</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-5xl font-bold mb-2">$199<span className="text-xl font-normal text-muted-foreground">/month</span></div>
+                                <div className="text-5xl font-bold mb-2">$39<span className="text-xl font-normal text-muted-foreground">/month</span></div>
                                 <ul className="mt-6 space-y-3 text-sm text-left">
                                     <li>✓ Your own dedicated instance</li>
                                     <li>✓ Unlimited conversations</li>
