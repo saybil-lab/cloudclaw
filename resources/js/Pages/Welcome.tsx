@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { PhoneInput } from '@/Components/ui/phone-input';
-import { Server, Zap, Shield, MessageCircle, ArrowRight, Menu, Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Server, Zap, Shield, MessageCircle, ArrowRight, Menu, Star, ChevronLeft, ChevronRight, Bell, Calendar, Mail, Clock, PenTool, Globe, Calculator, Handshake, ShoppingCart, Search, Users, FileText, BarChart, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import DeployAssistant from '@/Components/DeployAssistant';
 
@@ -41,6 +41,79 @@ const testimonials = [
         rating: 5,
     },
 ];
+
+const useCases = [
+    [
+        { text: "Notify before a meeting", icon: Bell },
+        { text: "Schedule meetings from chat", icon: Calendar },
+        { text: "Read & summarize email", icon: Mail },
+        { text: "Draft replies", icon: PenTool },
+        { text: "Remind you of deadlines", icon: Clock },
+        { text: "Plan your week", icon: Calendar },
+        { text: "Take meeting notes", icon: PenTool },
+    ],
+    [
+        { text: "Sync across time zones", icon: Globe },
+        { text: "Do your taxes", icon: Calculator },
+        { text: "Negotiate deals", icon: Handshake },
+        { text: "Run payroll calculations", icon: Calculator },
+        { text: "Negotiate refunds", icon: Handshake },
+        { text: "Find coupons", icon: ShoppingCart },
+        { text: "Find best prices online", icon: Search },
+    ],
+    [
+        { text: "Write contracts and NDAs", icon: FileText },
+        { text: "Research competitors", icon: Search },
+        { text: "Screen and prioritize leads", icon: Users },
+        { text: "Generate invoices", icon: FileText },
+        { text: "Run standup summaries", icon: MessageCircle },
+        { text: "Track OKRs and KPIs", icon: BarChart },
+        { text: "Monitor news and alerts", icon: Bell },
+    ]
+];
+
+function UseCasesSection() {
+    return (
+        <section className="py-24 bg-white overflow-hidden border-t border-border">
+            <div className="max-w-5xl mx-auto px-8 text-center mb-16">
+                <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">
+                    What can OpenClaw do for you?
+                </h2>
+                <p className="text-xl md:text-2xl text-muted-foreground font-medium">
+                    One assistant, thousands of use cases
+                </p>
+            </div>
+
+            <div className="max-w-6xl mx-auto px-4 relative">
+                {/* Edge Fades */}
+                <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none hidden md:block" />
+                <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none hidden md:block" />
+
+                <div className="flex flex-col gap-6">
+                    {useCases.map((row, i) => (
+                        <div key={i} className="flex relative overflow-hidden h-14">
+                            <div className={`flex gap-4 items-center whitespace-nowrap ${i === 0 ? 'animate-marquee' : i === 1 ? 'animate-marquee-reverse' : 'animate-marquee-slow'
+                                }`}>
+                                {[...row, ...row, ...row, ...row].map((item, j) => (
+                                    <div key={j} className="flex items-center gap-2.5 px-5 h-11 bg-zinc-50 border border-border rounded-full shadow-sm hover:border-primary/20 transition-colors group">
+                                        <item.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <span className="text-[14px] font-medium text-foreground/80">{item.text}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="max-w-5xl mx-auto px-8 text-center mt-16">
+                <p className="text-sm text-muted-foreground italic">
+                    PS. You can add as many use cases as you want via natural language
+                </p>
+            </div>
+        </section>
+    );
+}
 
 function TestimonialsSection() {
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -217,8 +290,82 @@ export default function Welcome({ canLogin, canRegister }: Props) {
                     </div>
                 </section>
 
+                {/* Comparison */}
+                <section className="py-24 px-8 bg-zinc-50/50 border-y border-border">
+                    <div className="max-w-5xl mx-auto">
+                        <div className="text-center mb-16">
+                            <span className="text-sm font-semibold text-primary tracking-wider uppercase mb-3 inline-block">Comparison</span>
+                            <h2 className="text-3xl md:text-5xl font-bold text-foreground">
+                                Traditional Method vs ClawdClaw
+                            </h2>
+                        </div>
+
+                        <div className="flex flex-col md:flex-row gap-0 border border-border rounded-2xl overflow-hidden bg-background shadow-sm">
+                            {/* Left Side - Traditional */}
+                            <div className="flex-1 p-8 md:p-12 border-b md:border-b-0 md:border-r border-border bg-zinc-50/50">
+                                <h3 className="text-xl font-semibold mb-8 text-muted-foreground italic">Traditional</h3>
+                                <div className="space-y-4 mb-8">
+                                    <div className="flex justify-between items-center text-sm md:text-base text-muted-foreground">
+                                        <span>Purchasing local virtual machine</span>
+                                        <span>15 min</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm md:text-base text-muted-foreground">
+                                        <span>Creating SSH keys and storing securely</span>
+                                        <span>10 min</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm md:text-base text-muted-foreground">
+                                        <span>Connecting to the server via SSH</span>
+                                        <span>5 min</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm md:text-base text-muted-foreground">
+                                        <span>Installing Node.js and NPM</span>
+                                        <span>5 min</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm md:text-base text-muted-foreground">
+                                        <span>Installing OpenClaw</span>
+                                        <span>7 min</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm md:text-base text-muted-foreground">
+                                        <span>Setting up OpenClaw</span>
+                                        <span>10 min</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm md:text-base text-muted-foreground">
+                                        <span>Connecting to AI provider</span>
+                                        <span>4 min</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm md:text-base text-muted-foreground">
+                                        <span>Pairing with Telegram</span>
+                                        <span>4 min</span>
+                                    </div>
+                                </div>
+                                <div className="border-t border-border pt-6 flex justify-between items-center font-bold text-lg text-foreground mb-6">
+                                    <span>Total</span>
+                                    <span>60 min</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground italic leading-relaxed">
+                                    If you're <span className="text-red-500 font-semibold">non-technical</span>, multiply these <span className="text-red-500 font-semibold bg-red-50 px-1 rounded">times by 10</span> — you have to learn each step before doing.
+                                </p>
+                            </div>
+
+                            {/* Right Side - ClawdClaw */}
+                            <div className="flex-1 p-8 md:p-12 bg-background flex flex-col justify-center">
+                                <h3 className="text-xl font-semibold mb-6 text-foreground italic">ClawdClaw</h3>
+                                <div className="text-5xl md:text-7xl font-bold text-foreground mb-6 tracking-tight">
+                                    &lt; 1 min
+                                </div>
+                                <p className="text-base md:text-lg text-muted-foreground mb-6 leading-relaxed">
+                                    Pick a model, connect Telegram, deploy — done under 1 minute.
+                                </p>
+                                <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
+                                    Servers, SSH and OpenClaw Environment are already set up, waiting to get assigned. Simple, secure and fast connection to your bot.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* Features */}
-                <section id="features" className="py-20 px-8 max-w-6xl mx-auto">
+                <section id="features" className="py-24 px-8 max-w-6xl mx-auto">
                     <h2 className="text-3xl font-bold text-center mb-12">
                         Everything You Need
                     </h2>
@@ -267,6 +414,9 @@ export default function Welcome({ canLogin, canRegister }: Props) {
 
                 {/* Testimonials */}
                 <TestimonialsSection />
+
+                {/* Use Cases */}
+                <UseCasesSection />
 
                 {/* Pricing */}
                 <section id="pricing" className="py-20 px-8">
