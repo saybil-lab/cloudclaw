@@ -288,6 +288,7 @@ export default function Welcome({ canLogin, canRegister }: Props) {
                                 <ul className="mt-6 space-y-3 text-sm text-left">
                                     <li>✓ Your own dedicated instance</li>
                                     <li>✓ Unlimited conversations</li>
+                                    <li>✓ $15 worth of AI tokens</li>
                                     <li>✓ Slack, Telegram, WhatsApp integration</li>
                                     <li>✓ Latest AI models (including Opus 4.6)</li>
                                     <li>✓ Priority support (human)</li>

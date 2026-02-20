@@ -71,6 +71,7 @@ export function SubscriptionCTA() {
     const features = [
         { text: "Your own dedicated instance", icon: ServerIcon },
         { text: "Unlimited conversations", icon: MessageSquareIcon },
+        { text: "$15 worth of AI tokens", icon: SparklesIcon },
         { text: "Slack, Telegram, WhatsApp integration", icon: SlackIcon },
         { text: "Latest AI models (including Opus 4.6)", icon: SparklesIcon },
         { text: "Priority support (human)", icon: UsersIcon },
