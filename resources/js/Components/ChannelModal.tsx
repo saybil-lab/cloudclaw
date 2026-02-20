@@ -9,10 +9,25 @@ interface ChannelModalProps {
     isOpen: boolean;
     onClose: () => void;
     channel: 'telegram' | 'discord' | 'whatsapp';
+    onConnect?: (token: string) => void;
 }
 
-export function ChannelModal({ isOpen, onClose, channel }: ChannelModalProps) {
+export function ChannelModal({ isOpen, onClose, channel, onConnect }: ChannelModalProps) {
     const [token, setToken] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSave = () => {
+        setIsLoading(true);
+        // Simulate saving
+        setTimeout(() => {
+            setIsLoading(false);
+            if (onConnect && token) {
+                onConnect(token);
+            }
+            onClose();
+            setToken('');
+        }, 800);
+    };
 
     const channelConfig = {
         telegram: {
@@ -59,8 +74,8 @@ export function ChannelModal({ isOpen, onClose, channel }: ChannelModalProps) {
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="!max-w-5xl p-0 overflow-hidden bg-card border-border shadow-2xl rounded-[24px]">
-                <div className="flex flex-col md:flex-row h-auto min-h-[500px]">
+            <DialogContent className="!max-w-5xl p-0 overflow-y-auto overflow-x-hidden max-h-[100vh] bg-card border-border shadow-2xl rounded-[24px]">
+                <div className="flex flex-col md:flex-row h-auto min-h-[700px]">
                     {/* Left Side: Form */}
                     <div className="flex-[1.2] p-10 flex flex-col">
                         <DialogHeader className="mb-8">
@@ -98,26 +113,26 @@ export function ChannelModal({ isOpen, onClose, channel }: ChannelModalProps) {
                                 />
                             </div>
 
-                            <Button className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 text-[14px] font-semibold rounded-xl transition-all shadow-md active:scale-[0.98]">
-                                Save & Connect
+                            <Button
+                                onClick={handleSave}
+                                disabled={isLoading || !token}
+                                className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 text-[14px] font-semibold rounded-xl transition-all shadow-md active:scale-[0.98]"
+                            >
+                                {isLoading ? 'Saving...' : 'Save & Connect'}
                             </Button>
                         </div>
                     </div>
 
                     {/* Right Side: Visual */}
-                    <div className="flex-1 bg-secondary border-l border-border relative hidden md:flex flex-col items-center justify-center p-10">
-                        <div className="w-full aspect-video bg-background rounded-2xl border border-border shadow-sm flex items-center justify-center group cursor-pointer hover:border-border/80 transition-all overflow-hidden relative">
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5"></div>
-                            <div className="w-16 h-16 bg-white/50 backdrop-blur-md rounded-full flex items-center justify-center group-hover:scale-110 transition-transform relative z-10 border border-slate-200 shadow-sm">
-                                <div className="w-0 h-0 border-t-[8px] border-t-transparent border-l-[14px] border-l-slate-800 border-b-[8px] border-b-transparent ml-1"></div>
-                            </div>
-                        </div>
-                        <div className="mt-8 text-center max-w-[240px]">
-                            <h4 className="text-[15px] font-semibold text-foreground/90">Setup Tutorial</h4>
-                            <p className="mt-2 text-[13px] text-muted-foreground leading-relaxed">
-                                Watch how to set up your {config.name} bot in under 60 seconds.
-                            </p>
-                        </div>
+                    <div className="flex-1 bg-[#111] border-t md:border-t-0 md:border-l border-border relative flex flex-col items-center justify-center overflow-hidden min-h-[700px] sm:min-h-[450px] md:min-h-0">
+                        <video
+                            src="/demo.mp4"
+                            className="absolute inset-0 w-full h-full object-cover"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                        />
                     </div>
                 </div>
             </DialogContent>
