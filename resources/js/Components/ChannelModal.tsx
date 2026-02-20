@@ -10,10 +10,11 @@ interface ChannelModalProps {
     onClose: () => void;
     channel: 'telegram' | 'discord' | 'whatsapp';
     onConnect?: (token: string) => void;
+    initialToken?: string;
 }
 
-export function ChannelModal({ isOpen, onClose, channel, onConnect }: ChannelModalProps) {
-    const [token, setToken] = useState('');
+export function ChannelModal({ isOpen, onClose, channel, onConnect, initialToken }: ChannelModalProps) {
+    const [token, setToken] = useState(initialToken || '');
     const [isLoading, setIsLoading] = useState(false);
 
     const handleSave = () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/Components/ui/button';
 import { Card } from '@/Components/ui/card';
 import { TelegramIcon, DiscordIcon, WhatsAppIcon, GoogleIcon, ClaudeIcon, OpenAIIcon, GeminiIcon } from './SocialIcons';
@@ -13,7 +13,23 @@ export default function DeployAssistant() {
 
     const [selectedModel, setSelectedModel] = useState<'claude' | 'gpt' | 'gemini'>('claude');
     const [selectedChannel, setSelectedChannel] = useState<'telegram' | 'discord' | 'whatsapp' | null>(null);
-    const [isTelegramConnected, setIsTelegramConnected] = useState(false);
+    const [telegramToken, setTelegramToken] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('telegramToken') || '';
+        }
+        return '';
+    });
+    const [isTelegramConnected, setIsTelegramConnected] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('isTelegramConnected') === 'true';
+        }
+        return false;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('isTelegramConnected', isTelegramConnected.toString());
+        localStorage.setItem('telegramToken', telegramToken);
+    }, [isTelegramConnected, telegramToken]);
 
     const handleGoogleLogin = () => {
         window.location.href = route('auth.google');
@@ -251,9 +267,11 @@ export default function DeployAssistant() {
                     isOpen={!!selectedChannel}
                     onClose={() => setSelectedChannel(null)}
                     channel={selectedChannel}
+                    initialToken={selectedChannel === 'telegram' ? telegramToken : ''}
                     onConnect={(token) => {
                         if (selectedChannel === 'telegram') {
                             setIsTelegramConnected(true);
+                            setTelegramToken(token);
                         }
                     }}
                 />
