@@ -3,9 +3,17 @@ import { Button } from '@/Components/ui/button';
 import { Card } from '@/Components/ui/card';
 import { TelegramIcon, DiscordIcon, WhatsAppIcon, GoogleIcon, ClaudeIcon, OpenAIIcon, GeminiIcon } from './SocialIcons';
 import { ChannelModal } from './ChannelModal';
-import { Check, LogOut } from 'lucide-react';
+import { Check, LogOut, AlertCircle } from 'lucide-react';
 import { usePage, router } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/Components/ui/dialog";
 
 export default function DeployAssistant() {
     const { auth } = usePage<any>().props;
@@ -40,6 +48,7 @@ export default function DeployAssistant() {
     };
 
     const [isLoading, setIsLoading] = useState(false);
+    const [showTelegramWarning, setShowTelegramWarning] = useState(false);
 
     const getCookie = (name: string): string => {
         const value = `; ${document.cookie}`
@@ -52,6 +61,12 @@ export default function DeployAssistant() {
 
     const handleDeploy: FormEventHandler = async (e) => {
         e.preventDefault();
+
+        if (!isTelegramConnected) {
+            setShowTelegramWarning(true);
+            return;
+        }
+
         setIsLoading(true);
 
         try {
@@ -229,9 +244,9 @@ export default function DeployAssistant() {
                             <form onSubmit={handleDeploy} className="w-full">
                                 <Button
                                     type="submit"
-                                    disabled={!isTelegramConnected || isLoading}
+                                    disabled={isLoading}
                                     variant="default"
-                                    className="bg-foreground text-background hover:bg-foreground/90 h-11 px-6 rounded-xl text-[14px] font-semibold transition-all shadow-sm flex items-center gap-2"
+                                    className="w-full sm:w-auto bg-foreground text-background hover:bg-foreground/90 h-11 px-6 rounded-xl text-[14px] font-semibold transition-all shadow-sm flex items-center justify-center gap-2"
                                 >
                                     {isLoading ? (
                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-r-transparent mr-1" />
@@ -248,7 +263,7 @@ export default function DeployAssistant() {
                         <Button
                             onClick={handleGoogleLogin}
                             variant={"outline"}
-                            className=" h-11 px-5 rounded-xl text-[14px] font-semibold transition-all bg-transparent border-gray-300 hover:bg-gray-50 text-gray-900 active:scale-[0.98]"
+                            className="w-full sm:w-auto h-11 px-5 rounded-xl text-[14px] font-semibold transition-all bg-transparent border-gray-300 hover:bg-gray-50 text-gray-900 active:scale-[0.98] flex items-center justify-center"
                         >
                             <GoogleIcon className="h-4 w-4 mr-2" />
                             Sign in with Google
@@ -276,6 +291,33 @@ export default function DeployAssistant() {
                     }}
                 />
             )}
+
+            <Dialog open={showTelegramWarning} onOpenChange={setShowTelegramWarning}>
+                <DialogContent className="sm:max-w-[425px] rounded-[24px]">
+                    <DialogHeader>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="bg-blue-50 p-2 rounded-full">
+                                <TelegramIcon className="h-6 w-6 text-blue-500" />
+                            </div>
+                            <DialogTitle className="text-xl">Connect Telegram</DialogTitle>
+                        </div>
+                        <DialogDescription className="text-base text-muted-foreground leading-relaxed">
+                            To deploy your OpenClaw assistant, you first need to connect your Telegram bot. This allows you to chat with your assistant anywhere.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="mt-4">
+                        <Button
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 text-[15px] font-semibold transition-all"
+                            onClick={() => {
+                                setShowTelegramWarning(false);
+                                setSelectedChannel('telegram');
+                            }}
+                        >
+                            Connect Now
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
