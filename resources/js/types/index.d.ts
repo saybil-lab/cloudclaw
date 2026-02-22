@@ -10,6 +10,7 @@ export interface Flash {
     success?: string;
     error?: string;
     info?: string;
+    gtm_event?: string;
 }
 
 export type PageProps<

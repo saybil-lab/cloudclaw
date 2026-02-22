@@ -4,6 +4,7 @@ import { Card } from '@/Components/ui/card';
 import { TelegramIcon, DiscordIcon, WhatsAppIcon, GoogleIcon, ClaudeIcon, OpenAIIcon, GeminiIcon } from './SocialIcons';
 import { ChannelModal } from './ChannelModal';
 import { Check, LogOut, AlertCircle } from 'lucide-react';
+import { trackEvent } from '@/lib/analytics';
 import { usePage, router } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 import {
@@ -68,6 +69,7 @@ export default function DeployAssistant() {
         }
 
         setIsLoading(true);
+        trackEvent('begin_checkout');
 
         try {
             const response = await fetch('/subscription/checkout', {

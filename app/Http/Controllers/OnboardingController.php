@@ -56,6 +56,8 @@ class OnboardingController extends Controller
             'onboarding_completed' => true,
         ]);
 
+        session()->flash('gtm_event', 'onboarding_complete');
+
         // Redirect to dashboard where they'll see the subscription CTA
         return redirect()->route('dashboard');
     }

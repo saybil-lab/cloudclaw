@@ -109,6 +109,6 @@ class SubscriptionController extends Controller
             }
         }
 
-        return redirect()->route('dashboard')->with('success', 'Subscription activated successfully!');
+        return redirect()->route('dashboard')->with('success', 'Subscription activated successfully!')->with('gtm_event', 'purchase');
     }
 }

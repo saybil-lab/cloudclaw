@@ -35,6 +35,7 @@ class GoogleAuthController extends Controller
                     'password' => bcrypt(Str::random(16)),
                     'email_verified_at' => now(),
                 ]);
+                session()->flash('gtm_event', 'sign_up');
             } else {
                 \Illuminate\Support\Facades\Log::info('Updating existing user', ['id' => $user->id]);
                 $user->update([

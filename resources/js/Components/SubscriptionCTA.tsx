@@ -1,4 +1,5 @@
 import React, { useState } from "react"
+import { trackEvent } from "@/lib/analytics"
 import { Button } from "@/Components/ui/button"
 import {
     Card,
@@ -32,6 +33,7 @@ export function SubscriptionCTA() {
     const handleSubscribe = async () => {
         setLoading(true)
         setError(null)
+        trackEvent('begin_checkout')
 
         try {
             const response = await fetch('/subscription/checkout', {

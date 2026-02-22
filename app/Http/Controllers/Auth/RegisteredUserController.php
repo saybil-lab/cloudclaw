@@ -46,6 +46,8 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
+        session()->flash('gtm_event', 'sign_up');
+
         return redirect(route('onboarding', absolute: false));
     }
 }
