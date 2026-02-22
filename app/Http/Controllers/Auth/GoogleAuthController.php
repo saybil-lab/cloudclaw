@@ -35,19 +35,24 @@ class GoogleAuthController extends Controller
                     'password' => bcrypt(Str::random(16)),
                     'email_verified_at' => now(),
                 ]);
-                session()->flash('gtm_event', 'sign_up');
+                $isNewUser = true;
             } else {
                 \Illuminate\Support\Facades\Log::info('Updating existing user', ['id' => $user->id]);
                 $user->update([
                     'google_id' => $googleUser->getId(),
                     'avatar' => $googleUser->getAvatar(),
                 ]);
+                $isNewUser = false;
             }
 
             Auth::login($user);
             \Illuminate\Support\Facades\Log::info('User logged in', ['id' => $user->id]);
 
-            return redirect()->intended('/');
+            $redirect = redirect()->intended('/');
+            if ($isNewUser) {
+                $redirect->with('gtm_event', 'sign_up');
+            }
+            return $redirect;
 
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Google Login Error: ' . $e->getMessage());
