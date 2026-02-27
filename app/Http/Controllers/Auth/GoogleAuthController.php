@@ -48,7 +48,7 @@ class GoogleAuthController extends Controller
             Auth::login($user);
             \Illuminate\Support\Facades\Log::info('User logged in', ['id' => $user->id]);
 
-            $redirect = redirect()->intended('/');
+            $redirect = redirect()->intended('/dashboard');
             if ($isNewUser) {
                 $redirect->with('gtm_event', 'sign_up');
             }

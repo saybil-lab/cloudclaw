@@ -135,6 +135,7 @@ class WebhookController extends Controller
                     'onboarding_completed' => true,
                     'subscription_status' => 'active',
                     'subscription_tier' => $tier,
+                    'stripe_subscription_id' => $subscriptionId,
                 ]);
 
                 // Grant tier credits

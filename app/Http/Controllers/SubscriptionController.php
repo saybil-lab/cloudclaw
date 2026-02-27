@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Log;
 class SubscriptionController extends Controller
 {
     /**
-     * Create a Stripe checkout session for subscription
+     * Create a Stripe checkout session for new subscription,
+     * or upgrade an existing subscription in-place.
      */
     public function checkout(Request $request)
     {
@@ -22,21 +23,130 @@ class SubscriptionController extends Controller
         $tier = $request->input('tier', 'starter');
         $tiers = config('services.stripe.tiers', []);
         $tierConfig = $tiers[$tier] ?? $tiers['starter'];
-
-        // Check if in mock/development mode
         $mockMode = config('services.stripe.mock', true);
 
+        // ─── Upgrade existing subscription ───
+        if ($user->hasActiveSubscription() && $user->subscription_tier !== $tier) {
+            return $this->handleUpgrade($user, $tier, $tierConfig, $mockMode);
+        }
+
+        // ─── New subscription ───
+        return $this->handleNewSubscription($user, $tier, $tierConfig, $mockMode);
+    }
+
+    protected function handleUpgrade($user, string $tier, array $tierConfig, bool $mockMode)
+    {
+        $oldTier = $user->subscription_tier;
+        $tiers = config('services.stripe.tiers', []);
+        $oldCredits = $tiers[$oldTier]['credits'] ?? 0;
+        $newCredits = $tierConfig['credits'];
+        $bonusCredits = max(0, $newCredits - $oldCredits);
+
         if ($mockMode) {
-            // In development, directly activate the subscription
+            $user->update(['subscription_tier' => $tier]);
+
+            // Grant the difference in credits
+            if ($bonusCredits > 0) {
+                $user->increment('llm_credits', $bonusCredits);
+            }
+
+            // Restart assistant if stopped
+            $stoppedServer = $user->servers()->where('status', 'stopped')->first();
+            if ($stoppedServer) {
+                RestartAssistantJob::dispatch($user->id);
+            }
+
+            return response()->json([
+                'mock' => true,
+                'success' => true,
+                'message' => "Upgraded to {$tier} (development mode)",
+            ]);
+        }
+
+        // Real Stripe: swap the price on the existing subscription
+        $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
+
+        if (!$user->stripe_subscription_id) {
+            Log::error('Upgrade failed: no stripe_subscription_id', ['user_id' => $user->id]);
+            return response()->json([
+                'error' => 'No active subscription found. Please contact support.',
+            ], 400);
+        }
+
+        $newPriceId = $tierConfig['stripe_price_id'];
+        if (!$newPriceId) {
+            return response()->json([
+                'error' => 'Payment configuration error. Please contact support.',
+            ], 500);
+        }
+
+        try {
+            // Retrieve the subscription and its current item
+            $subscription = $stripe->subscriptions->retrieve($user->stripe_subscription_id);
+            $itemId = $subscription->items->data[0]->id;
+
+            // Swap the price — prorate so user pays the difference immediately
+            $stripe->subscriptions->update($user->stripe_subscription_id, [
+                'items' => [[
+                    'id' => $itemId,
+                    'price' => $newPriceId,
+                ]],
+                'proration_behavior' => 'create_prorations',
+                'metadata' => [
+                    'tier' => $tier,
+                    'upgraded_from' => $oldTier,
+                ],
+            ]);
+
+            // Update user immediately (webhook will also confirm)
+            $user->update(['subscription_tier' => $tier]);
+
+            // Grant bonus credits (difference between tiers)
+            if ($bonusCredits > 0) {
+                $user->increment('llm_credits', $bonusCredits);
+            }
+
+            // Restart assistant if stopped
+            $stoppedServer = $user->servers()->where('status', 'stopped')->first();
+            if ($stoppedServer) {
+                RestartAssistantJob::dispatch($user->id);
+            }
+
+            Log::info('Subscription upgraded via Stripe', [
+                'user_id' => $user->id,
+                'from' => $oldTier,
+                'to' => $tier,
+                'bonus_credits' => $bonusCredits,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Upgraded to {$tier}",
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Stripe subscription upgrade failed', [
+                'user_id' => $user->id,
+                'tier' => $tier,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to upgrade. Please try again.',
+            ], 500);
+        }
+    }
+
+    protected function handleNewSubscription($user, string $tier, array $tierConfig, bool $mockMode)
+    {
+        if ($mockMode) {
             $user->update([
                 'subscription_status' => 'active',
                 'subscription_tier' => $tier,
             ]);
 
-            // Grant tier credits
             $user->increment('llm_credits', $tierConfig['credits']);
 
-            // Restart stopped assistant or deploy new one
             $stoppedServer = $user->servers()->where('status', 'stopped')->first();
             if ($stoppedServer) {
                 RestartAssistantJob::dispatch($user->id);
@@ -51,7 +161,7 @@ class SubscriptionController extends Controller
             ]);
         }
 
-        // Real Stripe integration
+        // Real Stripe checkout
         $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
         $priceId = $tierConfig['stripe_price_id'];
 
@@ -63,19 +173,15 @@ class SubscriptionController extends Controller
         }
 
         try {
-            // Get or create Stripe customer
             if (!$user->stripe_customer_id) {
                 $customer = $stripe->customers->create([
                     'email' => $user->email,
                     'name' => $user->name,
-                    'metadata' => [
-                        'user_id' => $user->id,
-                    ],
+                    'metadata' => ['user_id' => $user->id],
                 ]);
                 $user->update(['stripe_customer_id' => $customer->id]);
             }
 
-            // Create checkout session for subscription
             $session = $stripe->checkout->sessions->create([
                 'customer' => $user->stripe_customer_id,
                 'mode' => 'subscription',
@@ -93,9 +199,7 @@ class SubscriptionController extends Controller
                 ],
             ]);
 
-            return response()->json([
-                'url' => $session->url,
-            ]);
+            return response()->json(['url' => $session->url]);
 
         } catch (\Exception $e) {
             Log::error('Stripe subscription checkout failed', [
@@ -111,7 +215,7 @@ class SubscriptionController extends Controller
     }
 
     /**
-     * Handle successful subscription
+     * Handle successful subscription redirect
      */
     public function success(Request $request)
     {
@@ -119,16 +223,17 @@ class SubscriptionController extends Controller
         $user = $request->user();
 
         if ($sessionId) {
-            // Verify the session with Stripe
             try {
                 $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
                 $session = $stripe->checkout->sessions->retrieve($sessionId);
 
                 if ($session->payment_status === 'paid' && $session->metadata->user_id == $user->id) {
                     $tier = $session->metadata->tier ?? 'starter';
+                    $subscriptionId = $session->subscription ?? null;
                     $user->update([
                         'subscription_status' => 'active',
                         'subscription_tier' => $tier,
+                        'stripe_subscription_id' => $subscriptionId,
                     ]);
                 }
             } catch (\Exception $e) {

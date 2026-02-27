@@ -26,6 +26,7 @@ class User extends Authenticatable
         'password',
         'is_admin',
         'stripe_customer_id',
+        'stripe_subscription_id',
         'llm_billing_mode',
         'anthropic_api_key',
         'openai_api_key',

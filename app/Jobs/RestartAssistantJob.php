@@ -57,7 +57,19 @@ class RestartAssistantJob implements ShouldQueue
             $hostServer->ip = $hostIp;
 
             $sshService->execute($hostServer, 'docker start ' . escapeshellarg($server->container_name), 30);
-            $server->update(['status' => 'running']);
+
+            // Fetch current usage total so we only bill NEW usage from this point
+            sleep(3); // give container a moment to start
+            $cmd = 'docker exec ' . escapeshellarg($server->container_name)
+                . ' bash -c \'export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"; . ~/.profile 2>/dev/null; openclaw gateway usage-cost --json 2>/dev/null\'';
+            $usageResult = $sshService->execute($hostServer, $cmd, 15);
+            $currentCost = 0;
+            if ($usageResult['success'] && !empty($usageResult['stdout'])) {
+                $data = json_decode(trim($usageResult['stdout']), true);
+                $currentCost = (float) ($data['totals']['totalCost'] ?? 0);
+            }
+
+            $server->update(['status' => 'running', 'llm_usage_billed' => $currentCost]);
 
             Log::info('RestartAssistantJob: Container restarted', [
                 'user_id' => $this->userId,

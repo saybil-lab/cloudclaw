@@ -122,9 +122,12 @@ class DockerDeploymentService
                 ]);
             }
 
+            // Set the usage watermark to the current total so we only bill NEW usage
+            $initialCost = $this->fetchCurrentUsageCost($server);
             $server->update([
                 'status' => 'running',
                 'provision_status' => 'ready',
+                'llm_usage_billed' => $initialCost,
             ]);
             $server->appendProvisionLog("Container deployed and running.\nOpenClaw is connected to Telegram.");
 
@@ -153,6 +156,30 @@ class DockerDeploymentService
             ]);
 
             throw $e;
+        }
+    }
+
+    /**
+     * Fetch the current cumulative usage cost from a running container.
+     * Used to set the billing watermark so only new usage is charged.
+     */
+    protected function fetchCurrentUsageCost(Server $server): float
+    {
+        try {
+            $result = $this->executeInContainer(
+                $server,
+                '. ~/.profile 2>/dev/null; . ~/.bashrc 2>/dev/null; openclaw gateway usage-cost --json 2>/dev/null',
+                15
+            );
+
+            if (!$result['success'] || empty($result['stdout'])) {
+                return 0;
+            }
+
+            $data = json_decode(trim($result['stdout']), true);
+            return (float) ($data['totals']['totalCost'] ?? 0);
+        } catch (\Exception $e) {
+            return 0;
         }
     }
 
