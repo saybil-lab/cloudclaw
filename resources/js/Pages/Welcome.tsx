@@ -268,11 +268,14 @@ export default function Welcome({ canLogin, canRegister }: Props) {
 
                 {/* Hero */}
                 <section className="py-28 md:py-36 px-8">
-                    <div className="mx-auto max-w-3xl text-center">
+                    <div className="mx-auto max-w-5xl text-center">
+                        <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-gray-100 text-gray-700 mb-6">
+                            Join 5,000+ Executives and CEOs using ClawdClaw
+                        </div>
                         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                            Your AI Assistant,
+                            Your <span className="text-primary">OpenClaw</span> Assistant,
                             <br />
-                            <span className="text-primary">Ready in 30 Seconds</span>
+                            Ready in 30 Seconds
                         </h1>
                         <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground md:text-xl">
                             A personal AI that works for you 24/7 on Telegram, WhatsApp, or the web. No setup, no code, no hassle.
@@ -299,6 +302,41 @@ export default function Welcome({ canLogin, canRegister }: Props) {
                             <p className="text-sm text-muted-foreground">
                                 Plans starting at <span className="font-semibold text-foreground">$15/month</span> with 1,000 AI credits included. Cancel anytime.
                             </p>
+                        </div>
+
+                        {/* Use case carousel */}
+                        <div className="mt-14 relative overflow-hidden max-w-3xl mx-auto">
+                            <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+                            <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+                            <div className="flex gap-3 animate-marquee">
+                                {[
+                                    { icon: Mail, text: "Read & reply to emails" },
+                                    { icon: Calendar, text: "Schedule meetings" },
+                                    { icon: Search, text: "Research competitors" },
+                                    { icon: FileText, text: "Draft contracts" },
+                                    { icon: Users, text: "Screen leads" },
+                                    { icon: BarChart, text: "Track KPIs" },
+                                    { icon: Bell, text: "Meeting reminders" },
+                                    { icon: Calculator, text: "Run payroll" },
+                                    { icon: PenTool, text: "Write proposals" },
+                                    { icon: Globe, text: "Sync time zones" },
+                                    { icon: Mail, text: "Read & reply to emails" },
+                                    { icon: Calendar, text: "Schedule meetings" },
+                                    { icon: Search, text: "Research competitors" },
+                                    { icon: FileText, text: "Draft contracts" },
+                                    { icon: Users, text: "Screen leads" },
+                                    { icon: BarChart, text: "Track KPIs" },
+                                    { icon: Bell, text: "Meeting reminders" },
+                                    { icon: Calculator, text: "Run payroll" },
+                                    { icon: PenTool, text: "Write proposals" },
+                                    { icon: Globe, text: "Sync time zones" },
+                                ].map((item, i) => (
+                                    <div key={i} className="flex items-center gap-2 px-4 py-2 bg-zinc-50 border border-border rounded-full shrink-0">
+                                        <item.icon className="h-3.5 w-3.5 text-primary" />
+                                        <span className="text-xs font-medium text-foreground/70 whitespace-nowrap">{item.text}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </section>
