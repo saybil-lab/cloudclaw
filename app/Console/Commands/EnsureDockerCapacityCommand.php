@@ -42,9 +42,9 @@ class EnsureDockerCapacityCommand extends Command
         $location = config('services.docker.host_location', 'hel1');
         $maxContainers = config('services.docker.max_containers', 12);
 
-        $hostNumber = DockerHost::count() + 1;
+        $suffix = strtolower(\Illuminate\Support\Str::random(6));
         $host = DockerHost::create([
-            'name' => "cloudclaw-docker-host-{$hostNumber}",
+            'name' => "cc-docker-{$suffix}",
             'status' => 'provisioning',
             'server_type' => $serverType,
             'location' => $location,

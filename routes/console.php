@@ -19,6 +19,9 @@ Schedule::command('usage:sync-llm')->everyMinute()->name('sync-llm-usage');
 // Ensure Docker host capacity (auto-provision when slots run low)
 Schedule::command('docker:ensure-capacity')->everyMinute()->name('docker-ensure-capacity');
 
+// Retry pending deploys for subscribed users without assistants (every 2 minutes)
+Schedule::command('deploy:retry-pending')->everyTwoMinutes()->name('retry-pending-deploys');
+
 // Charge hourly server costs
 Schedule::call(function () {
     $provisioningService = app(ProvisioningService::class);
