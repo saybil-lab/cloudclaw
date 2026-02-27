@@ -63,9 +63,31 @@ class SyncLlmUsageCommand extends Command
                 return;
             }
 
+            // Safety: if watermark was never set (0) and there's significant accumulated usage,
+            // auto-set watermark to current total instead of billing all historical usage at once.
+            if ($previouslyBilled == 0 && $totalCost > 0.50) {
+                Log::warning('SyncLlmUsage: Watermark was 0 with significant usage — auto-setting watermark', [
+                    'server_id' => $server->id,
+                    'total_cost' => $totalCost,
+                ]);
+                $server->update(['llm_usage_billed' => $totalCost]);
+                $this->warn("  [Server {$server->id}] Auto-set watermark to \${$totalCost} (skipping stale usage)");
+                return;
+            }
+
             // Convert dollar cost to credit units
-            $creditsPerDollar = (int) config('services.stripe.credits_per_dollar', 100);
+            $creditsPerDollar = (int) config('services.stripe.credits_per_dollar', 250);
             $newUsageCredits = round($newUsageDollars * $creditsPerDollar, 2);
+
+            // Safety cap: max 200 credits per sync cycle (~$0.80 of API usage per minute)
+            if ($newUsageCredits > 200) {
+                Log::warning('SyncLlmUsage: Deduction capped', [
+                    'server_id' => $server->id,
+                    'calculated' => $newUsageCredits,
+                    'capped_to' => 200,
+                ]);
+                $newUsageCredits = 200;
+            }
 
             $this->deductCredits($user, $server, $newUsageCredits, $totalCost);
 

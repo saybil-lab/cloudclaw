@@ -6,7 +6,7 @@ import { Label } from '@/Components/ui/label';
 import { PhoneInput } from '@/Components/ui/phone-input';
 import { Server, Zap, Shield, MessageCircle, ArrowRight, Menu, Star, ChevronLeft, ChevronRight, Bell, Calendar, Mail, Clock, PenTool, Globe, Calculator, Handshake, ShoppingCart, Search, Users, FileText, BarChart, Sparkles } from 'lucide-react';
 import { useState } from 'react';
-import DeployAssistant from '@/Components/DeployAssistant';
+import { GoogleIcon } from '@/Components/SocialIcons';
 
 interface Props {
     canLogin: boolean;
@@ -267,26 +267,39 @@ export default function Welcome({ canLogin, canRegister }: Props) {
                 </header>
 
                 {/* Hero */}
-                <section className="py-24 px-8">
-                    <div className="mx-auto max-w-4xl text-center">
-                        <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-gray-100 text-gray-700 hover:bg-gray-200 mb-4">
-                            Join 5000+ Executives and CEOs using ClawdClaw
-                        </div>
+                <section className="py-28 md:py-36 px-8">
+                    <div className="mx-auto max-w-3xl text-center">
                         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                            Your <span className="text-primary">OpenClaw</span> Assistant
+                            Your AI Assistant,
                             <br />
-                            in 60 seconds
+                            <span className="text-primary">Ready in 30 Seconds</span>
                         </h1>
-                        <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
-                            Your personal AI assistant. Chat with it on Slack, Telegram,
-                            WhatsApp or the web – it learns your workflows, manages tasks, and gets things done.
+                        <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground md:text-xl">
+                            A personal AI that works for you 24/7 on Telegram, WhatsApp, or the web. No setup, no code, no hassle.
                         </p>
-                        <div className="mt-10 w-full flex justify-center">
-                            <DeployAssistant />
+                        <div className="mt-10 flex flex-col items-center gap-4">
+                            {canLogin ? (
+                                <Link
+                                    href={route('register')}
+                                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-base font-semibold transition-all bg-gray-900 text-white shadow-lg hover:bg-gray-800 active:scale-[0.98] h-14 px-10"
+                                >
+
+                                    Get My Assistant Now
+                                    <ArrowRight className="ml-1 h-5 w-5" />
+                                </Link>
+                            ) : (
+                                <Link
+                                    href={route('dashboard')}
+                                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-base font-semibold transition-all bg-gray-900 text-white shadow-lg hover:bg-gray-800 active:scale-[0.98] h-14 px-10"
+                                >
+                                    Go to Dashboard
+                                    <ArrowRight className="ml-1 h-5 w-5" />
+                                </Link>
+                            )}
+                            <p className="text-sm text-muted-foreground">
+                                Plans starting at <span className="font-semibold text-foreground">$15/month</span> with 1,000 AI credits included. Cancel anytime.
+                            </p>
                         </div>
-                        <p className="mt-4 text-sm text-muted-foreground">
-                            No technical skills required. Cancel anytime.
-                        </p>
                     </div>
                 </section>
 
