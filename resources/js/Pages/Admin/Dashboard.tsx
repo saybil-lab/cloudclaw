@@ -107,7 +107,7 @@ export default function AdminDashboard({ stats, recentUsers, recentServers, rece
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
-                                    €{Number(stats.total_revenue || 0).toFixed(2)}
+                                    ${Number(stats.total_revenue || 0).toFixed(2)}
                                 </div>
                             </CardContent>
                         </Card>
@@ -196,7 +196,7 @@ export default function AdminDashboard({ stats, recentUsers, recentServers, rece
                                                     </p>
                                                 </div>
                                                 <span className="font-medium text-green-600">
-                                                    +€{Number(tx.amount).toFixed(2)}
+                                                    +${Number(tx.amount).toFixed(2)}
                                                 </span>
                                             </div>
                                         ))

@@ -1,520 +1,216 @@
-import React from 'react';
+import React, { useState } from 'react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
-import { useForm, usePage, Link, router } from '@inertiajs/react';
+import { usePage, Link } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Button } from '@/Components/ui/button';
-import { Input } from '@/Components/ui/input';
-import { Label } from '@/Components/ui/label';
-import { Alert, AlertDescription } from '@/Components/ui/alert';
 import { Badge } from '@/Components/ui/badge';
+import { Progress } from '@/Components/ui/progress';
 import { SubscriptionCTA } from '@/Components/SubscriptionCTA';
 import {
-    Settings, CreditCard, Key, Check, AlertCircle,
-    ExternalLink, Wallet, HelpCircle, Trash2,
-    Brain, Sparkles, Zap
+    CheckCircle, CreditCard, SparklesIcon, UserIcon,
+    MailIcon, ArrowUpRightIcon, Loader2Icon, ArrowUpIcon,
 } from 'lucide-react';
-import { useState, useEffect, FormEvent } from 'react';
 
-interface Props {
-    llmBillingMode: 'credits' | 'byok';
-    hasAnthropicKey: boolean;
-    hasOpenaiKey: boolean;
-    llmCredits: number;
-    serverCredits: number;
-    hasActiveSubscription: boolean;
+interface Tier {
+    name: string;
+    price: number;
+    credits: number;
 }
 
-interface Flash {
-    success?: string;
-    error?: string;
+interface Props {
+    hasActiveSubscription: boolean;
+    subscriptionTier: string;
+    subscriptionStatus: string | null;
+    llmCredits: number;
+    tierCredits: number;
+    tierPrice: number;
+    tiers: Tier[];
+    userEmail: string;
+    userName: string;
 }
 
 function SettingsIndex({
-    llmBillingMode,
-    hasAnthropicKey,
-    hasOpenaiKey,
-    llmCredits,
-    serverCredits,
-    hasActiveSubscription
+    hasActiveSubscription,
+    subscriptionTier,
+    subscriptionStatus,
+    llmCredits: rawLlmCredits,
+    tierCredits,
+    tierPrice,
+    tiers,
+    userEmail,
+    userName,
 }: Props) {
-    const { flash } = usePage().props as { flash?: Flash };
+    const llmCredits = Number(rawLlmCredits) || 0;
+    const [upgrading, setUpgrading] = useState<string | null>(null);
 
     if (!hasActiveSubscription) {
-        return <SubscriptionCTA />;
+        return <SubscriptionCTA tiers={tiers} />;
     }
-    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-    const [showApiKeyForm, setShowApiKeyForm] = useState<'anthropic' | 'openai' | null>(null);
 
-    const billingForm = useForm({
-        llm_billing_mode: llmBillingMode,
-    });
+    const tierLabel = subscriptionTier.charAt(0).toUpperCase() + subscriptionTier.slice(1);
+    const creditsPercent = tierCredits > 0 ? Math.max(0, Math.min(100, (llmCredits / tierCredits) * 100)) : 0;
+    const tierOrder = ['starter', 'pro', 'beast'];
+    const currentTierIndex = tierOrder.indexOf(subscriptionTier);
 
-    const apiKeyForm = useForm({
-        provider: 'anthropic' as 'anthropic' | 'openai',
-        api_key: '',
-    });
-
-    useEffect(() => {
-        if (flash?.success) {
-            setMessage({ type: 'success', text: flash.success });
-        } else if (flash?.error) {
-            setMessage({ type: 'error', text: flash.error });
-        }
-    }, [flash]);
-
-    const hasAnyApiKey = hasAnthropicKey || hasOpenaiKey;
-
-    const handleBillingModeChange = (mode: 'credits' | 'byok') => {
-        if (mode === 'byok' && !hasAnyApiKey) {
-            setShowApiKeyForm('anthropic');
-            return;
-        }
-        billingForm.setData('llm_billing_mode', mode);
-        billingForm.post(route('settings.llm-billing-mode'), {
-            preserveScroll: true,
-        });
+    const getCookie = (name: string): string => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return decodeURIComponent(parts.pop()?.split(';').shift() || '');
+        return '';
     };
 
-    const handleApiKeySubmit = (e: FormEvent) => {
-        e.preventDefault();
-        apiKeyForm.post(route('settings.api-key'), {
-            preserveScroll: true,
-            onSuccess: () => {
-                setShowApiKeyForm(null);
-                apiKeyForm.reset();
-            },
-        });
-    };
-
-    const handleRemoveApiKey = (provider: 'anthropic' | 'openai') => {
-        const providerName = provider === 'anthropic' ? 'Anthropic' : 'OpenAI';
-        if (confirm(`Voulez-vous vraiment supprimer votre clé API ${providerName} ?`)) {
-            router.delete(route('settings.api-key.delete'), {
-                data: { provider },
-                preserveScroll: true,
+    const handleUpgrade = async (tierName: string) => {
+        setUpgrading(tierName);
+        try {
+            const response = await fetch('/subscription/checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-XSRF-TOKEN': getCookie('XSRF-TOKEN'),
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ tier: tierName }),
             });
+            const data = await response.json();
+            if (data.mock || data.success) {
+                window.location.reload();
+            } else if (data.url) {
+                window.location.href = data.url;
+            }
+        } catch {
+            // ignore
+        } finally {
+            setUpgrading(null);
         }
-    };
-
-    const openApiKeyForm = (provider: 'anthropic' | 'openai') => {
-        apiKeyForm.setData('provider', provider);
-        apiKeyForm.setData('api_key', '');
-        setShowApiKeyForm(provider);
     };
 
     return (
         <>
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-                    <p className="text-muted-foreground">
-                        Configure your LLM APIs and billing mode
-                    </p>
-                </div>
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+                <p className="text-muted-foreground">
+                    Manage your subscription and account.
+                </p>
             </div>
 
-            <div className="mx-auto max-w-3xl space-y-6">
-                    {/* Flash Messages */}
-                    {message && (
-                        <Alert className={message.type === 'success' ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}>
-                            {message.type === 'success' ? (
-                                <Check className="h-4 w-4 text-green-600" />
-                            ) : (
-                                <AlertCircle className="h-4 w-4 text-red-600" />
-                            )}
-                            <AlertDescription className={message.type === 'success' ? 'text-green-700' : 'text-red-700'}>
-                                {message.text}
-                            </AlertDescription>
-                        </Alert>
-                    )}
-
-                    {/* Info Card about Pricing Model */}
-                    <Card className="border-blue-200 bg-blue-50">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-2 text-blue-800">
-                                <Sparkles className="h-5 w-5" />
-                                Comment ça marche ?
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-sm text-blue-700 space-y-2">
-                            <p><strong>Serveur (Hébergement)</strong> : Abonnement mensuel fixe. CloudClaw gère tout pour vous.</p>
-                            <p><strong>LLM (Intelligence Artificielle)</strong> : Choisissez entre utiliser vos propres clés API (BYOK) ou acheter des crédits LLM.</p>
-                        </CardContent>
-                    </Card>
-
-                    {/* LLM Billing Mode Selection */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Brain className="h-5 w-5" />
-                                Mode de facturation LLM
-                            </CardTitle>
-                            <CardDescription>
-                                Comment souhaitez-vous payer l'utilisation des modèles IA (Claude, GPT, etc.) ?
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {/* Credits Mode */}
-                            <div
-                                className={`relative flex cursor-pointer rounded-xl border-2 p-5 transition-all ${
-                                    llmBillingMode === 'credits'
-                                        ? 'border-primary bg-primary/5'
-                                        : 'border-gray-200 hover:border-gray-300'
-                                }`}
-                                onClick={() => handleBillingModeChange('credits')}
-                            >
-                                <div className="flex w-full items-start justify-between">
-                                    <div className="flex items-start gap-4">
-                                        <div className={`p-3 rounded-full ${
-                                            llmBillingMode === 'credits' ? 'bg-primary text-white' : 'bg-gray-100'
-                                        }`}>
-                                            <Wallet className="h-6 w-6" />
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold text-lg">Crédits LLM CloudClaw</p>
-                                            <p className="text-muted-foreground mt-1">
-                                                Achetez des crédits et nous gérons les appels API pour vous.
-                                                Simple, sans configuration.
-                                            </p>
-                                            <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
-                                                <li className="flex items-center gap-2">
-                                                    <Check className="h-4 w-4 text-green-500" />
-                                                    Pas de compte API à créer
-                                                </li>
-                                                <li className="flex items-center gap-2">
-                                                    <Check className="h-4 w-4 text-green-500" />
-                                                    Paiement simple par carte
-                                                </li>
-                                                <li className="flex items-center gap-2">
-                                                    <Check className="h-4 w-4 text-green-500" />
-                                                    Accès à tous les modèles
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                    {llmBillingMode === 'credits' && (
-                                        <Badge className="bg-primary">Actif</Badge>
-                                    )}
-                                </div>
+            <div className="space-y-6">
+                {/* Current Plan */}
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <CreditCard className="h-5 w-5" />
+                                    Your Plan
+                                </CardTitle>
+                                <CardDescription>Current subscription details</CardDescription>
                             </div>
+                            <Badge variant="secondary" className="text-sm">
+                                {tierLabel} &middot; ${tierPrice}/mo
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        {/* Status */}
+                        <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-sm font-medium text-green-600">Active</span>
+                        </div>
 
-                            {/* BYOK Mode */}
-                            <div
-                                className={`relative flex cursor-pointer rounded-xl border-2 p-5 transition-all ${
-                                    llmBillingMode === 'byok'
-                                        ? 'border-green-500 bg-green-50'
-                                        : 'border-gray-200 hover:border-gray-300'
-                                }`}
-                                onClick={() => handleBillingModeChange('byok')}
-                            >
-                                <div className="flex w-full items-start justify-between">
-                                    <div className="flex items-start gap-4">
-                                        <div className={`p-3 rounded-full ${
-                                            llmBillingMode === 'byok' ? 'bg-green-600 text-white' : 'bg-gray-100'
-                                        }`}>
-                                            <Key className="h-6 w-6" />
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold text-lg">
-                                                BYOK - Vos propres clés API
-                                            </p>
-                                            <p className="text-muted-foreground mt-1">
-                                                Utilisez vos propres clés API Anthropic ou OpenAI.
-                                                Vous payez directement les fournisseurs.
-                                            </p>
-                                            <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
-                                                <li className="flex items-center gap-2">
-                                                    <Check className="h-4 w-4 text-green-500" />
-                                                    Prix API directs (potentiellement moins cher)
-                                                </li>
-                                                <li className="flex items-center gap-2">
-                                                    <Check className="h-4 w-4 text-green-500" />
-                                                    Contrôle total sur vos limites
-                                                </li>
-                                                <li className="flex items-center gap-2">
-                                                    <Check className="h-4 w-4 text-green-500" />
-                                                    Pas de frais LLM CloudClaw
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                    {llmBillingMode === 'byok' && (
-                                        <Badge className="bg-green-600">Actif</Badge>
-                                    )}
-                                </div>
+                        {/* AI Credits */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    <SparklesIcon className="h-4 w-4" />
+                                    AI Credits
+                                </span>
+                                <span className="font-medium">
+                                    {Math.floor(llmCredits).toLocaleString()} / {Math.floor(tierCredits).toLocaleString()} remaining
+                                </span>
                             </div>
+                            <Progress value={creditsPercent} className="h-2" />
+                            <p className="text-xs text-muted-foreground">
+                                Credits reset monthly with your {tierLabel} plan.
+                            </p>
+                        </div>
 
-                            {/* Current LLM balance info for credits mode */}
-                            {llmBillingMode === 'credits' && (
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <p className="font-medium">Crédits LLM disponibles</p>
-                                        <p className="text-2xl font-bold text-primary">€{Number(llmCredits).toFixed(2)}</p>
-                                    </div>
-                                    <Link href={route('credits.index')}>
-                                        <Button>
-                                            <CreditCard className="mr-2 h-4 w-4" />
-                                            Recharger
-                                        </Button>
-                                    </Link>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* API Keys Configuration */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Key className="h-5 w-5" />
-                                Clés API LLM
-                            </CardTitle>
-                            <CardDescription>
-                                {llmBillingMode === 'byok' 
-                                    ? 'Configurez au moins une clé API pour utiliser le mode BYOK'
-                                    : 'Optionnel : configurez vos clés pour passer en mode BYOK'
-                                }
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {/* Anthropic API Key */}
-                            <div className="p-4 border rounded-lg space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-orange-100 rounded-lg">
-                                            <Zap className="h-5 w-5 text-orange-600" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium">Anthropic (Claude)</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                Claude 3.5 Sonnet, Opus, Haiku
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {hasAnthropicKey ? (
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                                <Check className="h-3 w-3 mr-1" />
-                                                Configurée
-                                            </Badge>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="sm"
-                                                onClick={() => handleRemoveApiKey('anthropic')}
-                                            >
-                                                <Trash2 className="h-4 w-4 text-red-500" />
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm"
-                                            onClick={() => openApiKeyForm('anthropic')}
+                        {/* Plan comparison */}
+                        <div className="border-t pt-4">
+                            <p className="text-sm font-medium mb-3">All plans</p>
+                            <div className="grid gap-3 sm:grid-cols-3">
+                                {tiers.map((tier) => {
+                                    const isCurrentTier = tier.name === subscriptionTier;
+                                    const tierIdx = tierOrder.indexOf(tier.name);
+                                    const isUpgrade = tierIdx > currentTierIndex;
+                                    const label = tier.name.charAt(0).toUpperCase() + tier.name.slice(1);
+                                    return (
+                                        <div
+                                            key={tier.name}
+                                            className={`rounded-lg border p-3 text-center ${isCurrentTier ? 'border-primary bg-primary/5' : ''}`}
                                         >
-                                            <Key className="mr-2 h-4 w-4" />
-                                            Ajouter
-                                        </Button>
-                                    )}
-                                </div>
-                                
-                                {showApiKeyForm === 'anthropic' && (
-                                    <form onSubmit={handleApiKeySubmit} className="space-y-3 pt-3 border-t">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="anthropic_api_key">Clé API Anthropic</Label>
-                                            <Input
-                                                id="anthropic_api_key"
-                                                type="password"
-                                                value={apiKeyForm.data.api_key}
-                                                onChange={(e) => apiKeyForm.setData('api_key', e.target.value)}
-                                                placeholder="sk-ant-..."
-                                                className="font-mono"
-                                            />
-                                            {apiKeyForm.errors.api_key && (
-                                                <p className="text-sm text-red-500">{apiKeyForm.errors.api_key}</p>
+                                            <p className="font-semibold text-sm">{label}</p>
+                                            <p className="text-lg font-bold">${tier.price}<span className="text-xs font-normal text-muted-foreground">/mo</span></p>
+                                            <p className="text-xs text-muted-foreground">{tier.credits.toLocaleString()} credits/mo</p>
+                                            {isCurrentTier && (
+                                                <Badge variant="outline" className="mt-2 text-xs">Current</Badge>
+                                            )}
+                                            {isUpgrade && (
+                                                <Button
+                                                    size="sm"
+                                                    className="mt-2 w-full"
+                                                    disabled={upgrading !== null}
+                                                    onClick={() => handleUpgrade(tier.name)}
+                                                >
+                                                    {upgrading === tier.name ? (
+                                                        <Loader2Icon className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                                    ) : (
+                                                        <ArrowUpIcon className="mr-1.5 h-3.5 w-3.5" />
+                                                    )}
+                                                    Upgrade
+                                                </Button>
                                             )}
                                         </div>
-                                        <div className="flex gap-2">
-                                            <Button 
-                                                type="button" 
-                                                variant="outline"
-                                                onClick={() => {
-                                                    setShowApiKeyForm(null);
-                                                    apiKeyForm.reset();
-                                                }}
-                                            >
-                                                Annuler
-                                            </Button>
-                                            <Button 
-                                                type="submit"
-                                                disabled={apiKeyForm.processing || !apiKeyForm.data.api_key}
-                                            >
-                                                {apiKeyForm.processing ? 'Validation...' : 'Valider'}
-                                            </Button>
-                                        </div>
-                                        <a 
-                                            href="https://console.anthropic.com/account/keys" 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-2 text-sm text-primary hover:underline"
-                                        >
-                                            <ExternalLink className="h-4 w-4" />
-                                            Obtenir une clé API Anthropic
-                                        </a>
-                                    </form>
-                                )}
+                                    );
+                                })}
                             </div>
+                            <p className="text-xs text-muted-foreground mt-3">
+                                To cancel your subscription, contact us at{' '}
+                                <a href="mailto:support@clawdclaw.com" className="text-primary hover:underline">
+                                    support@clawdclaw.com
+                                </a>
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
 
-                            {/* OpenAI API Key */}
-                            <div className="p-4 border rounded-lg space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-emerald-100 rounded-lg">
-                                            <Brain className="h-5 w-5 text-emerald-600" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium">OpenAI (GPT)</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                GPT-4o, GPT-4 Turbo, GPT-3.5
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {hasOpenaiKey ? (
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                                <Check className="h-3 w-3 mr-1" />
-                                                Configurée
-                                            </Badge>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="sm"
-                                                onClick={() => handleRemoveApiKey('openai')}
-                                            >
-                                                <Trash2 className="h-4 w-4 text-red-500" />
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm"
-                                            onClick={() => openApiKeyForm('openai')}
-                                        >
-                                            <Key className="mr-2 h-4 w-4" />
-                                            Ajouter
-                                        </Button>
-                                    )}
-                                </div>
-                                
-                                {showApiKeyForm === 'openai' && (
-                                    <form onSubmit={handleApiKeySubmit} className="space-y-3 pt-3 border-t">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="openai_api_key">Clé API OpenAI</Label>
-                                            <Input
-                                                id="openai_api_key"
-                                                type="password"
-                                                value={apiKeyForm.data.api_key}
-                                                onChange={(e) => apiKeyForm.setData('api_key', e.target.value)}
-                                                placeholder="sk-..."
-                                                className="font-mono"
-                                            />
-                                            {apiKeyForm.errors.api_key && (
-                                                <p className="text-sm text-red-500">{apiKeyForm.errors.api_key}</p>
-                                            )}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <Button 
-                                                type="button" 
-                                                variant="outline"
-                                                onClick={() => {
-                                                    setShowApiKeyForm(null);
-                                                    apiKeyForm.reset();
-                                                }}
-                                            >
-                                                Annuler
-                                            </Button>
-                                            <Button 
-                                                type="submit"
-                                                disabled={apiKeyForm.processing || !apiKeyForm.data.api_key}
-                                            >
-                                                {apiKeyForm.processing ? 'Validation...' : 'Valider'}
-                                            </Button>
-                                        </div>
-                                        <a 
-                                            href="https://platform.openai.com/api-keys" 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-2 text-sm text-primary hover:underline"
-                                        >
-                                            <ExternalLink className="h-4 w-4" />
-                                            Obtenir une clé API OpenAI
-                                        </a>
-                                    </form>
-                                )}
+                {/* Account */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <UserIcon className="h-5 w-5" />
+                            Account
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium">{userName}</p>
+                                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                    <MailIcon className="h-3.5 w-3.5" />
+                                    {userEmail}
+                                </p>
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Server Credits Card */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <CreditCard className="h-5 w-5" />
-                                Crédits Serveur
-                            </CardTitle>
-                            <CardDescription>
-                                Pour payer l'hébergement de vos assistants
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                <div>
-                                    <p className="font-medium">Solde actuel</p>
-                                    <p className="text-2xl font-bold">€{Number(serverCredits).toFixed(2)}</p>
-                                </div>
-                                <Link href={route('credits.index')}>
-                                    <Button variant="outline">
-                                        <CreditCard className="mr-2 h-4 w-4" />
-                                        Gérer
-                                    </Button>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href="/profile">
+                                    Edit Profile
+                                    <ArrowUpRightIcon className="ml-1.5 h-3.5 w-3.5" />
                                 </Link>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Help Card */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg">
-                                <HelpCircle className="h-5 w-5" />
-                                Questions fréquentes
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4 text-sm">
-                                <div>
-                                    <p className="font-medium">Quelle est la différence entre crédits serveur et crédits LLM ?</p>
-                                    <p className="text-muted-foreground">
-                                        Les <strong>crédits serveur</strong> paient l'hébergement (le serveur qui fait tourner votre assistant).
-                                        Les <strong>crédits LLM</strong> paient l'intelligence artificielle (Claude, GPT, etc.).
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="font-medium">Que se passe-t-il si j'ai mes propres clés API ?</p>
-                                    <p className="text-muted-foreground">
-                                        En mode BYOK, vous utilisez vos propres clés API et payez directement Anthropic/OpenAI.
-                                        Vous n'avez pas besoin de crédits LLM CloudClaw.
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="font-medium">Puis-je changer de mode ?</p>
-                                    <p className="text-muted-foreground">
-                                        Oui, à tout moment. Vos clés API restent enregistrées même si vous passez en mode crédits.
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </>
     );
 }

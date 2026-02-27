@@ -167,13 +167,13 @@ export default function AdminUserShow({ user, servers, creditBalance, transactio
                             </CardHeader>
                             <CardContent>
                                 <div className="text-3xl font-bold mb-4">
-                                    €{Number(creditBalance).toFixed(2)}
+                                    ${Number(creditBalance).toFixed(2)}
                                 </div>
 
                                 {showAddCredits && (
                                     <form onSubmit={handleAddCredits} className="space-y-4 p-4 bg-gray-50 rounded-lg">
                                         <div>
-                                            <Label htmlFor="amount">Amount (€)</Label>
+                                            <Label htmlFor="amount">Amount ($)</Label>
                                             <Input
                                                 id="amount"
                                                 type="number"
@@ -271,10 +271,9 @@ export default function AdminUserShow({ user, servers, creditBalance, transactio
                                                     <TableCell className="text-muted-foreground">
                                                         {new Date(tx.created_at).toLocaleDateString()}
                                                     </TableCell>
-                                                    <TableCell className={`text-right font-medium ${
-                                                        Number(tx.amount) >= 0 ? 'text-green-600' : 'text-red-600'
-                                                    }`}>
-                                                        {Number(tx.amount) >= 0 ? '+' : ''}€{Number(tx.amount).toFixed(2)}
+                                                    <TableCell className={`text-right font-medium ${Number(tx.amount) >= 0 ? 'text-green-600' : 'text-red-600'
+                                                        }`}>
+                                                        {Number(tx.amount) >= 0 ? '+' : ''}${Number(tx.amount).toFixed(2)}
                                                     </TableCell>
                                                 </TableRow>
                                             ))}

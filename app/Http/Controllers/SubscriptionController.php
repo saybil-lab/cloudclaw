@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\AutoDeployJob;
+use App\Jobs\RestartAssistantJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -12,14 +14,35 @@ class SubscriptionController extends Controller
      */
     public function checkout(Request $request)
     {
+        $request->validate([
+            'tier' => 'sometimes|string|in:starter,pro,beast',
+        ]);
+
         $user = $request->user();
+        $tier = $request->input('tier', 'starter');
+        $tiers = config('services.stripe.tiers', []);
+        $tierConfig = $tiers[$tier] ?? $tiers['starter'];
 
         // Check if in mock/development mode
         $mockMode = config('services.stripe.mock', true);
 
         if ($mockMode) {
             // In development, directly activate the subscription
-            $user->update(['subscription_status' => 'active']);
+            $user->update([
+                'subscription_status' => 'active',
+                'subscription_tier' => $tier,
+            ]);
+
+            // Grant tier credits
+            $user->increment('llm_credits', $tierConfig['credits']);
+
+            // Restart stopped assistant or deploy new one
+            $stoppedServer = $user->servers()->where('status', 'stopped')->first();
+            if ($stoppedServer) {
+                RestartAssistantJob::dispatch($user->id);
+            } else {
+                AutoDeployJob::dispatch($user->id);
+            }
 
             return response()->json([
                 'mock' => true,
@@ -30,10 +53,10 @@ class SubscriptionController extends Controller
 
         // Real Stripe integration
         $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
-        $priceId = config('services.stripe.price_id');
+        $priceId = $tierConfig['stripe_price_id'];
 
         if (!$priceId) {
-            Log::error('Stripe price ID not configured');
+            Log::error('Stripe price ID not configured for tier', ['tier' => $tier]);
             return response()->json([
                 'error' => 'Payment configuration error. Please contact support.',
             ], 500);
@@ -65,6 +88,8 @@ class SubscriptionController extends Controller
                 'cancel_url' => route('dashboard'),
                 'metadata' => [
                     'user_id' => $user->id,
+                    'type' => 'subscription',
+                    'tier' => $tier,
                 ],
             ]);
 
@@ -75,6 +100,7 @@ class SubscriptionController extends Controller
         } catch (\Exception $e) {
             Log::error('Stripe subscription checkout failed', [
                 'user_id' => $user->id,
+                'tier' => $tier,
                 'error' => $e->getMessage(),
             ]);
 
@@ -99,7 +125,11 @@ class SubscriptionController extends Controller
                 $session = $stripe->checkout->sessions->retrieve($sessionId);
 
                 if ($session->payment_status === 'paid' && $session->metadata->user_id == $user->id) {
-                    $user->update(['subscription_status' => 'active']);
+                    $tier = $session->metadata->tier ?? 'starter';
+                    $user->update([
+                        'subscription_status' => 'active',
+                        'subscription_tier' => $tier,
+                    ]);
                 }
             } catch (\Exception $e) {
                 Log::error('Failed to verify subscription session', [

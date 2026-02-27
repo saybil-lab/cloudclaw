@@ -5,7 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
 import { SubscriptionCTA } from '@/Components/SubscriptionCTA';
-import { CpuIcon, PlusIcon, ArrowRightIcon, MonitorIcon, PowerIcon } from 'lucide-react';
+import { CpuIcon, PlusIcon, ArrowRightIcon, MonitorIcon, PowerIcon, AlertTriangleIcon, KeyIcon } from 'lucide-react';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/Components/ui/popover"
 
 interface Assistant {
     id: number;
@@ -30,6 +35,7 @@ interface Props {
     assistants: Assistant[];
     serverTypes: ServerType[];
     hasActiveSubscription: boolean;
+    hasLlmApiKey?: boolean;
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -45,7 +51,7 @@ const getServerTypeLabel = (serverTypes: ServerType[], name: string): string => 
     return type?.label || name;
 };
 
-function AssistantsIndex({ assistants, serverTypes, hasActiveSubscription }: Props) {
+function AssistantsIndex({ assistants, serverTypes, hasActiveSubscription, hasLlmApiKey }: Props) {
     if (!hasActiveSubscription) {
         return <SubscriptionCTA />;
     }
@@ -108,9 +114,37 @@ function AssistantsIndex({ assistants, serverTypes, hasActiveSubscription }: Pro
                                                     </code>
                                                 </CardDescription>
                                             </div>
-                                            <Badge className={`${status.bg} ${status.color}`}>
-                                                {status.label}
-                                            </Badge>
+                                            <div className="flex items-center gap-2">
+                                                {!hasLlmApiKey && assistant.status === 'running' && (
+                                                    <Popover>
+                                                        <PopoverTrigger asChild onClick={(e) => e.preventDefault()}>
+                                                            <button className="rounded-full p-1 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors">
+                                                                <AlertTriangleIcon className="h-4 w-4 text-orange-500" />
+                                                            </button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-72" side="bottom" align="end">
+                                                            <div className="flex items-start gap-3">
+                                                                <KeyIcon className="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" />
+                                                                <div className="space-y-2">
+                                                                    <p className="text-sm font-medium">No AI API key linked</p>
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        This assistant won't respond to messages until you link an AI API key.
+                                                                    </p>
+                                                                    <Button size="sm" variant="outline" asChild className="w-full">
+                                                                        <Link href="/settings">
+                                                                            <KeyIcon className="mr-2 h-3 w-3" />
+                                                                            Configure AI Key
+                                                                        </Link>
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                )}
+                                                <Badge className={`${status.bg} ${status.color}`}>
+                                                    {status.label}
+                                                </Badge>
+                                            </div>
                                         </div>
                                     </CardHeader>
                                     <CardContent>
@@ -121,13 +155,13 @@ function AssistantsIndex({ assistants, serverTypes, hasActiveSubscription }: Pro
                                                     <PowerIcon className={`h-4 w-4 ${assistant.status === 'running' ? 'text-green-500' : 'text-muted-foreground'}`} />
                                                     <span className="text-muted-foreground">
                                                         {assistant.status === 'running' ? 'Online' :
-                                                         assistant.status === 'stopped' ? 'Offline' :
-                                                         assistant.status === 'provisioning' ? 'Installing...' :
-                                                         'Pending'}
+                                                            assistant.status === 'stopped' ? 'Offline' :
+                                                                assistant.status === 'provisioning' ? 'Installing...' :
+                                                                    'Pending'}
                                                     </span>
                                                 </div>
                                                 <span className="text-muted-foreground">
-                                                    €{Number(assistant.monthly_price).toFixed(2)}/mo
+                                                    ${Number(assistant.monthly_price).toFixed(2)}/mo
                                                 </span>
                                             </div>
 

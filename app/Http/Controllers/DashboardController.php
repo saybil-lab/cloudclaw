@@ -2,87 +2,85 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\CreditService;
-use App\Services\ProvisioningService;
-use Carbon\Carbon;
+use App\Services\DockerDeploymentService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
-    public function __construct(
-        protected CreditService $creditService,
-        protected ProvisioningService $provisioningService
-    ) {}
-
     public function index(Request $request)
     {
         $user = $request->user();
-
-        $assistants = $user->servers()
-            ->whereNotIn('status', ['deleted'])
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        $creditBalance = $this->creditService->getBalance($user);
-        $recentTransactions = $this->creditService->getTransactions($user, 5);
-
-        // Calculate stats
-        $activeAssistants = $assistants->where('status', 'running')->count();
-        $totalAssistants = $assistants->count();
-
-        // Calculate usage from transactions
-        $today = Carbon::today();
-        $startOfMonth = Carbon::now()->startOfMonth();
-
-        $usageToday = abs($user->creditTransactions()
-            ->where('type', 'debit')
-            ->whereDate('created_at', $today)
-            ->sum('amount'));
-
-        $usageThisMonth = abs($user->creditTransactions()
-            ->where('type', 'debit')
-            ->where('created_at', '>=', $startOfMonth)
-            ->sum('amount'));
-
-        $stats = [
-            'total_assistants' => $totalAssistants,
-            'active_assistants' => $activeAssistants,
-            'total_credits' => $creditBalance,
-            'llm_credits' => (float) $user->llm_credits,
-            'usage_today' => $usageToday,
-            'usage_this_month' => $usageThisMonth,
-        ];
-
-        // Generate chart data for last 7 days
-        $chartData = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::today()->subDays($i);
-            $usage = abs($user->creditTransactions()
-                ->where('type', 'debit')
-                ->whereDate('created_at', $date)
-                ->sum('amount'));
-
-            $chartData[] = [
-                'date' => $date->format('D'),
-                'fullDate' => $date->format('M d, Y'),
-                'usage' => (float) $usage,
-            ];
-        }
-
-        // Get recent activity (placeholder - you can create an ActivityLog model later)
-        $recentActivity = [];
+        $server = $user->servers()->whereNotIn('status', ['deleted'])->latest()->first();
+        $tiers = config('services.stripe.tiers', []);
+        $currentTier = $user->subscription_tier ?? 'starter';
 
         return Inertia::render('Dashboard', [
-            'assistants' => $assistants,
-            'stats' => $stats,
-            'chartData' => $chartData,
-            'recentActivity' => $recentActivity,
-            'recentTransactions' => $recentTransactions,
-            'llmBillingMode' => $user->llm_billing_mode,
-            'hasLlmApiKey' => $user->hasLlmApiKey(),
             'hasActiveSubscription' => $user->hasActiveSubscription(),
-            'subscriptionStatus' => $user->subscription_status,
+            'subscriptionTier' => $currentTier,
+            'llmCredits' => (float) $user->llm_credits,
+            'tierCredits' => $tiers[$currentTier]['credits'] ?? 14,
+            'tierPrice' => $tiers[$currentTier]['price'] ?? 9,
+            'assistant' => $server ? [
+                'id' => $server->id,
+                'name' => $server->name,
+                'status' => $server->status,
+                'provision_status' => $server->provision_status,
+                'provision_log' => $server->provision_log,
+                'bot_username' => $server->bot_username,
+                'telegram_url' => $server->bot_username ? "https://t.me/{$server->bot_username}" : null,
+                'created_at' => $server->created_at->toISOString(),
+            ] : null,
+            'tiers' => collect($tiers)->map(fn($t, $k) => [
+                'name' => $k,
+                'price' => $t['price'],
+                'credits' => $t['credits'],
+            ])->values(),
         ]);
+    }
+
+    /**
+     * AJAX polling endpoint for assistant status
+     */
+    public function status(Request $request)
+    {
+        $server = $request->user()->servers()->whereNotIn('status', ['deleted'])->latest()->first();
+
+        if (!$server) {
+            return response()->json(['status' => 'none']);
+        }
+
+        return response()->json([
+            'id' => $server->id,
+            'name' => $server->name,
+            'status' => $server->status,
+            'provision_status' => $server->provision_status,
+            'provision_log' => $server->provision_log,
+            'bot_username' => $server->bot_username,
+            'telegram_url' => $server->bot_username ? "https://t.me/{$server->bot_username}" : null,
+        ]);
+    }
+
+    /**
+     * Delete the user's assistant
+     */
+    public function destroyAssistant(Request $request)
+    {
+        $server = $request->user()->servers()->whereNotIn('status', ['deleted'])->latest()->first();
+
+        if (!$server) {
+            return back()->withErrors(['error' => 'No assistant found.']);
+        }
+
+        try {
+            if ($server->isDocker()) {
+                app(DockerDeploymentService::class)->deleteContainer($server);
+            } else {
+                $server->update(['status' => 'deleted']);
+            }
+            return redirect()->route('dashboard')->with('success', 'Assistant deleted successfully.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
     }
 }

@@ -29,7 +29,7 @@ export const GoogleIcon = ({ className }: { className?: string }) => (
 
 export const ClaudeIcon = ({ className }: { className?: string }) => (
     <img
-        src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Claude_AI_symbol.svg/512px-Claude_AI_symbol.svg.png?20250427183551"
+        src="/claude.png"
         alt="Claude"
         className={className}
     />
@@ -37,7 +37,7 @@ export const ClaudeIcon = ({ className }: { className?: string }) => (
 
 export const OpenAIIcon = ({ className }: { className?: string }) => (
     <img
-        src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/ChatGPT-Logo.svg/512px-ChatGPT-Logo.svg.png?20240214002031"
+        src="/chatgpt.png"
         alt="OpenAI"
         className={className}
     />
@@ -45,7 +45,7 @@ export const OpenAIIcon = ({ className }: { className?: string }) => (
 
 export const GeminiIcon = ({ className }: { className?: string }) => (
     <img
-        src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Google_Gemini_icon_2025.svg/512px-Google_Gemini_icon_2025.svg.png?20250728014952"
+        src="/gemini.png"
         alt="Gemini"
         className={className}
     />

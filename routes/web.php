@@ -11,6 +11,7 @@ use App\Http\Controllers\ServerController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -34,26 +35,39 @@ Route::middleware(['auth'])->group(function () {
 
 // Authenticated routes
 Route::middleware(['auth', 'verified'])->group(function () {
-    // Dashboard
+    // Dashboard (single-assistant view)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/status', [DashboardController::class, 'status'])->name('dashboard.status');
+    Route::delete('/dashboard/assistant', [DashboardController::class, 'destroyAssistant'])->name('dashboard.destroy');
 
-    // Assistants (anciennement Servers)
-    Route::get('/assistants', [ServerController::class, 'index'])->name('assistants.index');
-    Route::get('/assistants/create', [ServerController::class, 'create'])->name('assistants.create');
+    // Legacy redirects — old multi-assistant/credits pages now go to dashboard
+    Route::redirect('/assistants', '/dashboard');
+    Route::redirect('/assistants/create', '/dashboard');
+    Route::redirect('/credits', '/dashboard');
+
+    // Assistants (kept for backward compat / admin, not linked in sidebar)
+    Route::get('/assistants/list', [ServerController::class, 'index'])->name('assistants.index');
+    Route::get('/assistants/new', [ServerController::class, 'create'])->name('assistants.create');
     Route::post('/assistants', [ServerController::class, 'store'])->name('assistants.store');
+    Route::get('/assistants/{server}/status', [ServerController::class, 'status'])->name('assistants.status');
     Route::get('/assistants/{server}', [ServerController::class, 'show'])->name('assistants.show');
     Route::delete('/assistants/{server}', [ServerController::class, 'destroy'])->name('assistants.destroy');
     Route::post('/assistants/{server}/power', [ServerController::class, 'power'])->name('assistants.power');
 
     // Legacy routes redirects
-    Route::redirect('/servers', '/assistants');
-    Route::redirect('/servers/create', '/assistants/create');
+    Route::redirect('/servers', '/dashboard');
+    Route::redirect('/servers/create', '/dashboard');
 
-    // Credits (for servers)
-    Route::get('/credits', [CreditController::class, 'index'])->name('credits.index');
+    // Credits (kept for backward compat, not linked in sidebar)
+    Route::get('/credits/manage', [CreditController::class, 'index'])->name('credits.index');
     Route::post('/credits/purchase', [CreditController::class, 'purchase'])->name('credits.purchase');
     Route::get('/credits/success', [CreditController::class, 'success'])->name('credits.success');
     Route::post('/credits/confirm', [CreditController::class, 'confirm'])->name('credits.confirm');
+
+    // Skills (coming soon)
+    Route::get('/skills', function () {
+        return Inertia::render('Skills/Index');
+    })->name('skills.index');
 
     // Settings (LLM billing mode and API keys)
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
@@ -69,6 +83,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Subscription
     Route::post('/subscription/checkout', [SubscriptionController::class, 'checkout'])->name('subscription.checkout');
     Route::get('/subscription/success', [SubscriptionController::class, 'success'])->name('subscription.success');
+
+    // Deployments
+    Route::post('/deploy', [DeploymentController::class, 'store'])->name('deploy.store');
+    Route::get('/deploy/{server}/status', [DeploymentController::class, 'status'])->name('deploy.status');
 });
 
 // Admin routes
@@ -91,7 +109,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe'])
     ->name('webhooks.stripe')
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
 Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('auth.google');
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('auth.google.callback');
 

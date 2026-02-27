@@ -13,6 +13,12 @@ Artisan::command('inspire', function () {
 // Check server status every 5 minutes
 Schedule::job(new CheckServerStatusJob())->everyFiveMinutes();
 
+// Sync LLM usage and deduct AI credits every minute
+Schedule::command('usage:sync-llm')->everyMinute()->name('sync-llm-usage');
+
+// Ensure Docker host capacity (auto-provision when slots run low)
+Schedule::command('docker:ensure-capacity')->everyMinute()->name('docker-ensure-capacity');
+
 // Charge hourly server costs
 Schedule::call(function () {
     $provisioningService = app(ProvisioningService::class);

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\AutoDeployJob;
+use App\Jobs\RestartAssistantJob;
 use App\Models\User;
 use App\Services\CreditService;
 use Illuminate\Http\Request;
@@ -124,14 +126,42 @@ class WebhookController extends Controller
                     ? ($session->subscription ?? null)
                     : ($session['subscription'] ?? null);
 
+                // Read tier from metadata
+                $tier = is_object($metadata) ? ($metadata->tier ?? 'starter') : ($metadata['tier'] ?? 'starter');
+                $tiers = config('services.stripe.tiers', []);
+                $tierConfig = $tiers[$tier] ?? $tiers['starter'] ?? ['credits' => 14.00];
+
                 $user->update([
                     'onboarding_completed' => true,
                     'subscription_status' => 'active',
+                    'subscription_tier' => $tier,
                 ]);
+
+                // Grant tier credits
+                $user->increment('llm_credits', $tierConfig['credits']);
+                Log::info('Tier credits granted', [
+                    'user_id' => $user->id,
+                    'tier' => $tier,
+                    'credits' => $tierConfig['credits'],
+                ]);
+
+                // Grant welcome bonus if first subscription
+                if (!$user->received_welcome_bonus) {
+                    $user->update(['received_welcome_bonus' => true]);
+                }
+
+                // Restart stopped assistant or deploy new one
+                $stoppedServer = $user->servers()->where('status', 'stopped')->first();
+                if ($stoppedServer) {
+                    RestartAssistantJob::dispatch($user->id);
+                } else {
+                    AutoDeployJob::dispatch($user->id);
+                }
 
                 Log::info('Subscription activated from checkout session', [
                     'user_id' => $user->id,
                     'subscription_id' => $subscriptionId,
+                    'tier' => $tier,
                 ]);
 
                 return response()->json([
@@ -356,12 +386,34 @@ class WebhookController extends Controller
             'subscription_id' => $subscriptionId,
         ]);
 
-        // If this is a subscription invoice, ensure user is active
+        // If this is a subscription invoice, ensure user is active and grant renewal credits
         if ($subscriptionId) {
             $user = User::where('stripe_customer_id', $customerId)->first();
-            if ($user && $user->subscription_status !== 'active') {
-                $user->update(['subscription_status' => 'active']);
-                Log::info('User subscription reactivated from invoice payment', ['user_id' => $user->id]);
+            if ($user) {
+                if ($user->subscription_status !== 'active') {
+                    $user->update(['subscription_status' => 'active']);
+                    Log::info('User subscription reactivated from invoice payment', ['user_id' => $user->id]);
+                }
+
+                // Grant monthly tier credits on renewal (skip first invoice — handled in checkout)
+                $billingReason = is_object($invoice) ? ($invoice->billing_reason ?? null) : ($invoice['billing_reason'] ?? null);
+                if ($billingReason === 'subscription_cycle') {
+                    $tier = $user->subscription_tier ?? 'starter';
+                    $tiers = config('services.stripe.tiers', []);
+                    $tierConfig = $tiers[$tier] ?? $tiers['starter'] ?? ['credits' => 1000];
+                    $user->increment('llm_credits', $tierConfig['credits']);
+                    Log::info('Monthly tier credits granted on renewal', [
+                        'user_id' => $user->id,
+                        'tier' => $tier,
+                        'credits' => $tierConfig['credits'],
+                    ]);
+
+                    // Restart assistant if it was stopped due to credit depletion
+                    $stoppedServer = $user->servers()->where('status', 'stopped')->first();
+                    if ($stoppedServer) {
+                        RestartAssistantJob::dispatch($user->id);
+                    }
+                }
             }
         }
 

@@ -43,6 +43,7 @@ interface Assistant {
 interface Props {
     assistant: Assistant;
     hasActiveSubscription: boolean;
+    hasLlmApiKey?: boolean;
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string; description: string }> = {
@@ -53,7 +54,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string; d
     error: { label: 'Error', color: 'text-red-600', bg: 'bg-red-500/10', description: 'An error occurred' },
 };
 
-function ShowAssistant({ assistant, hasActiveSubscription }: Props) {
+function ShowAssistant({ assistant, hasActiveSubscription, hasLlmApiKey }: Props) {
     const [copied, setCopied] = useState<string | null>(null);
     const [showVnc, setShowVnc] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -129,7 +130,7 @@ function ShowAssistant({ assistant, hasActiveSubscription }: Props) {
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                {/* <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={handleRefresh}>
                         <RefreshCwIcon className="h-4 w-4" />
                     </Button>
@@ -145,10 +146,27 @@ function ShowAssistant({ assistant, hasActiveSubscription }: Props) {
                             Start
                         </Button>
                     )}
-                </div>
+                </div> */}
             </div>
 
             <div className="space-y-6">
+                {/* AI API Key Warning */}
+                {!hasLlmApiKey && assistant.status === 'running' && (
+                    <Alert className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950">
+                        <AlertCircleIcon className="h-4 w-4 text-orange-500" />
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <AlertTitle className="text-orange-700 dark:text-orange-300">LLM API key not configured</AlertTitle>
+                                <AlertDescription className="text-orange-600 dark:text-orange-400">
+                                    Configure your AI provider API key so this assistant can respond to messages.
+                                </AlertDescription>
+                            </div>
+                            <Button variant="outline" size="sm" asChild className="border-orange-200 text-orange-700 hover:bg-orange-100 hover:text-orange-800">
+                                <Link href="/settings">Configure Key</Link>
+                            </Button>
+                        </div>
+                    </Alert>
+                )}
                 {/* Provisioning Status */}
                 {isProvisioning && (
                     <Alert>
@@ -285,7 +303,7 @@ function ShowAssistant({ assistant, hasActiveSubscription }: Props) {
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Monthly cost</span>
-                                        <span className="font-medium">€{Number(assistant.monthly_price).toFixed(2)}</span>
+                                        <span className="font-medium">${Number(assistant.monthly_price).toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Created</span>

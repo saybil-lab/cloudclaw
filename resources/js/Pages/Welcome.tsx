@@ -420,40 +420,87 @@ export default function Welcome({ canLogin, canRegister }: Props) {
 
                 {/* Pricing */}
                 <section id="pricing" className="py-20 px-8">
-                    <div className="max-w-xl mx-auto text-center">
+                    <div className="max-w-4xl mx-auto text-center">
                         <h2 className="text-3xl font-bold mb-4">
                             Simple, Transparent Pricing
                         </h2>
                         <p className="text-muted-foreground mb-12">
-                            One plan, everything included
+                            Choose the plan that fits your needs
                         </p>
 
-                        <Card className="border-primary">
-                            <CardHeader>
-                                <CardTitle className="text-2xl">Pro</CardTitle>
-                                <CardDescription>Everything you need</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-5xl font-bold mb-2">$39<span className="text-xl font-normal text-muted-foreground">/month</span></div>
-                                <ul className="mt-6 space-y-3 text-sm text-left">
-                                    <li>✓ Your own dedicated instance</li>
-                                    <li>✓ Unlimited conversations</li>
-                                    <li>✓ $15 worth of AI tokens</li>
-                                    <li>✓ Slack, Telegram, WhatsApp integration</li>
-                                    <li>✓ Latest AI models (including Opus 4.6)</li>
-                                    <li>✓ Priority support (human)</li>
-                                    <li>✓ Personalized advisory service tailored to your use cases</li>
-                                    <li>✓ Cancel anytime</li>
-                                </ul>
-                                <Link
-                                    href={route('register')}
-                                    className="inline-flex items-center justify-center w-full mt-8 gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-gray-900 text-white shadow hover:bg-gray-800 h-11 px-8"
-                                >
-                                    Get Started
-                                    <ArrowRight className="ml-2 h-4 w-4" />
-                                </Link>
-                            </CardContent>
-                        </Card>
+                        <div className="grid gap-6 md:grid-cols-3">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-xl">Starter</CardTitle>
+                                    <CardDescription>For getting started</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-4xl font-bold mb-1">$15<span className="text-base font-normal text-muted-foreground">/mo</span></div>
+                                    <p className="text-sm text-muted-foreground mb-6">1,000 credits/mo</p>
+                                    <ul className="space-y-2 text-sm text-left">
+                                        <li>✓ Telegram integration</li>
+                                        <li>✓ Claude AI (latest models)</li>
+                                        <li>✓ Cancel anytime</li>
+                                    </ul>
+                                    <Link
+                                        href={route('register')}
+                                        className="inline-flex items-center justify-center w-full mt-6 gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors border border-gray-300 bg-white text-gray-900 shadow-sm hover:bg-gray-50 h-10 px-6"
+                                    >
+                                        Get Started
+                                    </Link>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="border-primary relative">
+                                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                                    <span className="bg-gray-900 text-white text-xs font-semibold px-3 py-1 rounded-full">Most Popular</span>
+                                </div>
+                                <CardHeader>
+                                    <CardTitle className="text-xl">Pro</CardTitle>
+                                    <CardDescription>For professionals</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-4xl font-bold mb-1">$39<span className="text-base font-normal text-muted-foreground">/mo</span></div>
+                                    <p className="text-sm text-muted-foreground mb-6">3,000 credits/mo</p>
+                                    <ul className="space-y-2 text-sm text-left">
+                                        <li>✓ Telegram integration</li>
+                                        <li>✓ Claude AI (latest models)</li>
+                                        <li>✓ Priority support</li>
+                                        <li>✓ Cancel anytime</li>
+                                    </ul>
+                                    <Link
+                                        href={route('register')}
+                                        className="inline-flex items-center justify-center w-full mt-6 gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-gray-900 text-white shadow hover:bg-gray-800 h-10 px-6"
+                                    >
+                                        Get Started
+                                        <ArrowRight className="ml-1 h-4 w-4" />
+                                    </Link>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-xl">Beast</CardTitle>
+                                    <CardDescription>For power users</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-4xl font-bold mb-1">$89<span className="text-base font-normal text-muted-foreground">/mo</span></div>
+                                    <p className="text-sm text-muted-foreground mb-6">8,000 credits/mo</p>
+                                    <ul className="space-y-2 text-sm text-left">
+                                        <li>✓ Telegram integration</li>
+                                        <li>✓ Claude AI (latest models)</li>
+                                        <li>✓ Priority support</li>
+                                        <li>✓ Cancel anytime</li>
+                                    </ul>
+                                    <Link
+                                        href={route('register')}
+                                        className="inline-flex items-center justify-center w-full mt-6 gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors border border-gray-300 bg-white text-gray-900 shadow-sm hover:bg-gray-50 h-10 px-6"
+                                    >
+                                        Get Started
+                                    </Link>
+                                </CardContent>
+                            </Card>
+                        </div>
                     </div>
                 </section>
 

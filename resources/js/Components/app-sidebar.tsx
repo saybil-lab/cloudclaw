@@ -1,11 +1,11 @@
 import * as React from "react"
 import {
     LayoutDashboardIcon,
-    CpuIcon,
-    CreditCardIcon,
     SettingsIcon,
     HelpCircleIcon,
+    PuzzleIcon,
 } from "lucide-react"
+import { Badge } from "@/Components/ui/badge"
 
 import { NavMain } from "@/Components/nav-main"
 import { NavSecondary } from "@/Components/nav-secondary"
@@ -30,28 +30,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             title: "Dashboard",
             url: "/dashboard",
             icon: LayoutDashboardIcon,
-            isActive: currentPath === '/dashboard',
+            isActive: currentPath === '/dashboard' || currentPath.startsWith('/dashboard'),
         },
         {
-            title: "Assistants",
-            url: "/assistants",
-            icon: CpuIcon,
-            isActive: currentPath.startsWith('/assistants'),
+            title: "Skills",
+            url: "/skills",
+            icon: PuzzleIcon,
+            isActive: currentPath.startsWith('/skills'),
+            badge: <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal">Soon</Badge>,
         },
-        {
-            title: "Credits",
-            url: "/credits",
-            icon: CreditCardIcon,
-            isActive: currentPath.startsWith('/credits'),
-        },
-    ]
-
-    const navSecondary = [
         {
             title: "Settings",
             url: "/settings",
             icon: SettingsIcon,
+            isActive: currentPath.startsWith('/settings'),
         },
+    ]
+
+    const navSecondary = [
         {
             title: "Help",
             url: "mailto:support@clawdclaw.com",

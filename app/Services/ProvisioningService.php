@@ -28,7 +28,7 @@ class ProvisioningService
         $monthlyPrice = $this->getMonthlyPrice($serverType);
 
         if (!$this->credits->hasEnoughCredits($user, $monthlyPrice)) {
-            throw new \Exception('Crédits insuffisants. Veuillez ajouter au moins €' . number_format($monthlyPrice, 2) . ' à votre compte.');
+            throw new \Exception('Crédits insuffisants. Veuillez ajouter au moins $' . number_format($monthlyPrice, 2) . ' à votre compte.');
         }
 
         // Create server record
@@ -147,13 +147,12 @@ class ProvisioningService
     public function getMonthlyPrice(string $serverType): float
     {
         $prices = [
-            'cx22' => 4.99,
-            'cx32' => 9.99,
-            'cx42' => 19.99,
-            'cx52' => 39.99,
+            'cpx22' => 9.99,
+            'cpx32' => 10.99,
+            'cpx42' => 19.99,
         ];
 
-        return $prices[$serverType] ?? 4.99;
+        return $prices[$serverType] ?? 9.99;
     }
 
     /**
@@ -163,21 +162,21 @@ class ProvisioningService
     {
         return [
             [
-                'name' => 'cx22',
-                'label' => 'Essentiel',
-                'description' => '2 cœurs, 4Go RAM, 40Go stockage',
-                'monthly_price' => 4.99,
-            ],
-            [
-                'name' => 'cx32',
-                'label' => 'Confort',
-                'description' => '4 cœurs, 8Go RAM, 80Go stockage',
+                'name' => 'cpx22',
+                'label' => 'CPX22',
+                'description' => 'AMD, 2 cores, 4 GB RAM, 80 GB disk',
                 'monthly_price' => 9.99,
             ],
             [
-                'name' => 'cx42',
-                'label' => 'Performance',
-                'description' => '8 cœurs, 16Go RAM, 160Go stockage',
+                'name' => 'cpx32',
+                'label' => 'CPX32',
+                'description' => 'AMD, 4 cores, 8 GB RAM, 160 GB disk',
+                'monthly_price' => 10.99,
+            ],
+            [
+                'name' => 'cpx42',
+                'label' => 'CPX42',
+                'description' => 'AMD, 8 cores, 16 GB RAM, 320 GB disk',
                 'monthly_price' => 19.99,
             ],
         ];

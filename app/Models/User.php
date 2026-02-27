@@ -30,13 +30,19 @@ class User extends Authenticatable
         'anthropic_api_key',
         'openai_api_key',
         'llm_credits',
+        'received_welcome_bonus',
         'use_case',
         'team_size',
         'priority',
         'onboarding_completed',
         'subscription_status',
+        'subscription_tier',
         'google_id',
         'avatar',
+        'apple_user_id',
+        'revenuecat_user_id',
+        'platform',
+        'has_consented',
     ];
 
     /**
@@ -64,6 +70,8 @@ class User extends Authenticatable
             'is_admin' => 'boolean',
             'llm_credits' => 'decimal:2',
             'onboarding_completed' => 'boolean',
+            'has_consented' => 'boolean',
+            'received_welcome_bonus' => 'boolean',
         ];
     }
 

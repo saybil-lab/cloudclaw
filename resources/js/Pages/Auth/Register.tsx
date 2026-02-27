@@ -16,6 +16,8 @@ import {
     FieldLabel,
 } from '@/Components/ui/field';
 import { Input } from '@/Components/ui/input';
+import { GoogleIcon } from '@/Components/SocialIcons';
+import { Separator } from '@/Components/ui/separator';
 
 export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -33,6 +35,10 @@ export default function Register() {
         });
     };
 
+    const handleGoogleLogin = () => {
+        window.location.href = route('auth.google');
+    };
+
     return (
         <>
             <Head title="Create Account" />
@@ -47,10 +53,30 @@ export default function Register() {
                         <CardHeader className="text-center">
                             <CardTitle className="text-2xl">Create your account</CardTitle>
                             <CardDescription>
-                                Enter your information below to get started
+                                Get your AI assistant in under a minute
                             </CardDescription>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="space-y-4">
+                            {/* Google Auth */}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full h-11"
+                                onClick={handleGoogleLogin}
+                            >
+                                <GoogleIcon className="h-4 w-4 mr-2" />
+                                Continue with Google
+                            </Button>
+
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <Separator />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-card px-2 text-muted-foreground">or</span>
+                                </div>
+                            </div>
+
                             <form onSubmit={submit}>
                                 <FieldGroup>
                                     <Field>

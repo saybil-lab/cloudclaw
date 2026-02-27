@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Server;
+use App\Services\DockerDeploymentService;
 use App\Services\HetznerService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,17 +39,62 @@ class CheckServerStatusJob implements ShouldQueue
         if ($this->serverId) {
             $server = Server::find($this->serverId);
             if ($server) {
-                $this->checkServer($server, $hetzner);
+                if ($server->isDocker()) {
+                    $this->checkDockerServer($server);
+                } else {
+                    $this->checkServer($server, $hetzner);
+                }
             }
         } else {
-            // Check all active servers
-            $servers = Server::whereNotIn('status', ['deleted', 'error'])
+            // Check VM servers
+            $vmServers = Server::whereNotIn('status', ['deleted', 'error'])
                 ->whereNotNull('hetzner_id')
                 ->get();
 
-            foreach ($servers as $server) {
+            foreach ($vmServers as $server) {
                 $this->checkServer($server, $hetzner);
             }
+
+            // Check Docker containers
+            $dockerServers = Server::whereNotIn('status', ['deleted', 'error'])
+                ->where('deployment_type', 'docker')
+                ->whereNotNull('container_name')
+                ->get();
+
+            foreach ($dockerServers as $server) {
+                $this->checkDockerServer($server);
+            }
+        }
+    }
+
+    protected function checkDockerServer(Server $server): void
+    {
+        Log::debug('Checking Docker container status', ['server_id' => $server->id]);
+
+        try {
+            $containerStatus = app(DockerDeploymentService::class)->getContainerStatus($server);
+
+            $newStatus = match ($containerStatus) {
+                'running' => 'running',
+                'exited', 'dead', 'created', 'paused' => 'stopped',
+                'not_found' => 'error',
+                default => $server->status,
+            };
+
+            if ($newStatus !== $server->status) {
+                $server->update(['status' => $newStatus]);
+                Log::info('Docker container status updated', [
+                    'server_id' => $server->id,
+                    'old_status' => $server->status,
+                    'new_status' => $newStatus,
+                    'container_status' => $containerStatus,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error checking Docker container status', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

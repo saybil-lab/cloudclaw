@@ -106,7 +106,7 @@ export default function AdminUsersIndex({ users, filters }: Props) {
                                                 )}
                                             </TableCell>
                                             <TableCell>{user.servers_count}</TableCell>
-                                            <TableCell>€{Number(user.credit_balance).toFixed(2)}</TableCell>
+                                            <TableCell>${Number(user.credit_balance).toFixed(2)}</TableCell>
                                             <TableCell className="text-muted-foreground">
                                                 {new Date(user.created_at).toLocaleDateString()}
                                             </TableCell>

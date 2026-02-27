@@ -107,8 +107,8 @@ class CreditService
 
         $productName = $creditType === 'llm' ? 'CloudClaw LLM Credits' : 'CloudClaw Server Credits';
         $productDescription = $creditType === 'llm' 
-            ? "€{$amount} in LLM credits for AI models"
-            : "€{$amount} in server hosting credits";
+            ? "${$amount} in LLM credits for AI models"
+            : "${$amount} in server hosting credits";
 
         try {
             $session = $this->stripe->checkout->sessions->create([
@@ -293,11 +293,11 @@ class CreditService
     public function getCreditPackages(): array
     {
         return [
-            ['amount' => 5, 'label' => '€5', 'bonus' => 0],
-            ['amount' => 10, 'label' => '€10', 'bonus' => 0],
-            ['amount' => 25, 'label' => '€25', 'bonus' => 1],
-            ['amount' => 50, 'label' => '€50', 'bonus' => 3],
-            ['amount' => 100, 'label' => '€100', 'bonus' => 10],
+            ['amount' => 5, 'label' => '$5', 'bonus' => 0],
+            ['amount' => 10, 'label' => '$10', 'bonus' => 0],
+            ['amount' => 25, 'label' => '$25', 'bonus' => 1],
+            ['amount' => 50, 'label' => '$50', 'bonus' => 3],
+            ['amount' => 100, 'label' => '$100', 'bonus' => 10],
         ];
     }
 

@@ -97,7 +97,7 @@ class CreditController extends Controller
         // If mock mode
         if ($request->get('mock')) {
             return redirect()->route('credits.index')
-                ->with('success', 'Crédits ajoutés avec succès !');
+                ->with('success', 'Credits added successfully!');
         }
 
         // Verify the checkout session
@@ -116,7 +116,7 @@ class CreditController extends Controller
                             $user,
                             0, // No server credits
                             'llm_purchase',
-                            'LLM credit purchase: €' . $result['amount'],
+                            'LLM credit purchase: $' . $result['amount'],
                             $result['payment_intent']
                         );
                     } else {
@@ -130,14 +130,14 @@ class CreditController extends Controller
                     }
                 }
 
-                $label = $type === 'llm' ? 'crédits LLM' : 'crédits serveur';
+                $label = $type === 'llm' ? 'AI credits' : 'server credits';
                 return redirect()->route('credits.index')
-                    ->with('success', 'Paiement réussi ! €' . $result['amount'] . ' ' . $label . ' ajoutés.');
+                    ->with('success', 'Payment successful! $' . $result['amount'] . ' ' . $label . ' added.');
             }
         }
 
         return redirect()->route('credits.index')
-            ->with('info', 'Paiement en cours de traitement. Les crédits seront ajoutés sous peu.');
+            ->with('info', 'Payment is being processed. Credits will be added shortly.');
     }
 
     /**

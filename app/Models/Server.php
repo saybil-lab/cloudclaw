@@ -30,6 +30,13 @@ class Server extends Model
         'root_password',
         'openclaw_installed',
         'provisioned_at',
+        'telegram_token',
+        'bot_username',
+        'llm_usage_billed',
+        'deployment_type',
+        'container_name',
+        'docker_host_ip',
+        'docker_host_id',
     ];
 
     protected $casts = [
@@ -43,11 +50,22 @@ class Server extends Model
         'vnc_password',
         'email_password',
         'root_password',
+        'telegram_token',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function dockerHost(): BelongsTo
+    {
+        return $this->belongsTo(DockerHost::class);
+    }
+
+    public function isDocker(): bool
+    {
+        return $this->deployment_type === 'docker';
     }
 
     public function isRunning(): bool

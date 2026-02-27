@@ -4,21 +4,75 @@ import { Button } from "@/Components/ui/button"
 import {
     Card,
     CardContent,
+    CardHeader,
+    CardTitle,
 } from "@/Components/ui/card"
+import { Badge } from "@/Components/ui/badge"
 import {
     CheckIcon,
     Loader2Icon,
-    MailIcon,
-    MessageSquareIcon,
-    ServerIcon,
-    SlackIcon,
     SparklesIcon,
-    UsersIcon,
-    CheckCircleIcon,
+    ZapIcon,
+    RocketIcon,
+    CrownIcon,
 } from "lucide-react"
 
-export function SubscriptionCTA() {
-    const [loading, setLoading] = useState(false)
+interface Tier {
+    name: string
+    price: number
+    credits: number
+}
+
+interface Props {
+    tiers?: Tier[]
+}
+
+const tierMeta: Record<string, {
+    label: string
+    icon: typeof SparklesIcon
+    features: string[]
+    highlight?: boolean
+}> = {
+    starter: {
+        label: "Starter",
+        icon: ZapIcon,
+        features: [
+            "Telegram integration",
+            "Claude AI (latest models)",
+            "Cancel anytime",
+        ],
+    },
+    pro: {
+        label: "Pro",
+        icon: RocketIcon,
+        highlight: true,
+        features: [
+            "Telegram integration",
+            "Claude AI (latest models)",
+            "Priority support",
+            "Cancel anytime",
+        ],
+    },
+    beast: {
+        label: "Beast",
+        icon: CrownIcon,
+        features: [
+            "Telegram integration",
+            "Claude AI (latest models)",
+            "Priority support",
+            "Cancel anytime",
+        ],
+    },
+}
+
+const defaultTiers: Tier[] = [
+    { name: 'starter', price: 15, credits: 1000 },
+    { name: 'pro', price: 39, credits: 3000 },
+    { name: 'beast', price: 89, credits: 8000 },
+]
+
+export function SubscriptionCTA({ tiers = defaultTiers }: Props) {
+    const [loading, setLoading] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
 
     const getCookie = (name: string): string => {
@@ -30,10 +84,10 @@ export function SubscriptionCTA() {
         return ''
     }
 
-    const handleSubscribe = async () => {
-        setLoading(true)
+    const handleSubscribe = async (tierName: string) => {
+        setLoading(tierName)
         setError(null)
-        trackEvent('begin_checkout')
+        trackEvent('begin_checkout', { tier: tierName })
 
         try {
             const response = await fetch('/subscription/checkout', {
@@ -44,6 +98,7 @@ export function SubscriptionCTA() {
                     'X-XSRF-TOKEN': getCookie('XSRF-TOKEN'),
                 },
                 credentials: 'same-origin',
+                body: JSON.stringify({ tier: tierName }),
             })
 
             const data = await response.json()
@@ -53,9 +108,9 @@ export function SubscriptionCTA() {
                 return
             }
 
-            // Mock mode - reload page
+            // Mock mode - redirect to dashboard
             if (data.mock || data.success) {
-                window.location.reload()
+                window.location.href = '/dashboard'
                 return
             }
 
@@ -66,78 +121,92 @@ export function SubscriptionCTA() {
         } catch (err) {
             setError('An error occurred. Please try again.')
         } finally {
-            setLoading(false)
+            setLoading(null)
         }
     }
 
-    const features = [
-        { text: "Your own dedicated instance", icon: ServerIcon },
-        { text: "Unlimited conversations", icon: MessageSquareIcon },
-        { text: "$15 worth of AI tokens", icon: SparklesIcon },
-        { text: "Slack, Telegram, WhatsApp integration", icon: SlackIcon },
-        { text: "Latest AI models (including Opus 4.6)", icon: SparklesIcon },
-        { text: "Priority support (human)", icon: UsersIcon },
-        { text: "Personalized advisory service tailored to your use cases", icon: CheckCircleIcon },
-        { text: "Dedicated email address for your assistant", icon: MailIcon },
-        { text: "Cancel anytime", icon: CheckIcon },
-    ]
-
     return (
-        <div className="flex items-center justify-center min-h-[60vh]">
-            <Card className="w-full max-w-lg">
-                <CardContent className="space-y-6 pt-6">
-                    {/* Price */}
-                    <div className="text-center">
-                        <div className="flex items-baseline justify-center gap-1">
-                            <span className="text-4xl font-bold">$39</span>
-                            <span className="text-muted-foreground">/month</span>
-                        </div>
-                    </div>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+            <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold tracking-tight mb-2">Choose your plan</h2>
+                <p className="text-muted-foreground">Get your AI assistant on Telegram in under a minute.</p>
+            </div>
 
-                    {/* Features */}
-                    <div className="space-y-3">
-                        {features.map((feature, index) => (
-                            <div key={index} className="flex items-start gap-3">
-                                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-500/10">
-                                    <CheckIcon className="h-3 w-3 text-green-600" />
+            {error && (
+                <div className="rounded-lg bg-red-50 dark:bg-red-950 p-3 text-sm text-red-600 dark:text-red-400 mb-6 max-w-md w-full text-center">
+                    {error}
+                </div>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-3 w-full max-w-4xl">
+                {tiers.map((tier) => {
+                    const meta = tierMeta[tier.name] || tierMeta.starter
+                    const Icon = meta.icon
+                    const isPopular = meta.highlight
+
+                    return (
+                        <Card
+                            key={tier.name}
+                            className={`relative flex flex-col ${isPopular ? 'border-primary shadow-lg ring-1 ring-primary/20' : ''}`}
+                        >
+                            {isPopular && (
+                                <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground">
+                                    Most Popular
+                                </Badge>
+                            )}
+                            <CardHeader className="text-center pb-2">
+                                <div className="flex items-center justify-center gap-2 mb-1">
+                                    <Icon className="h-5 w-5 text-primary" />
+                                    <CardTitle className="text-lg">{meta.label}</CardTitle>
                                 </div>
-                                <span className="text-sm">{feature.text}</span>
-                            </div>
-                        ))}
-                    </div>
+                                <div className="flex items-baseline justify-center gap-1">
+                                    <span className="text-3xl font-bold">${tier.price}</span>
+                                    <span className="text-muted-foreground text-sm">/mo</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    {tier.credits.toLocaleString()} credits/mo
+                                </p>
+                            </CardHeader>
+                            <CardContent className="flex-1 flex flex-col">
+                                <div className="space-y-2.5 flex-1">
+                                    {meta.features.map((feature, i) => (
+                                        <div key={i} className="flex items-start gap-2.5">
+                                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-500/10">
+                                                <CheckIcon className="h-3 w-3 text-green-600" />
+                                            </div>
+                                            <span className="text-sm">{feature}</span>
+                                        </div>
+                                    ))}
+                                </div>
 
-                    {/* Error */}
-                    {error && (
-                        <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
-                            {error}
-                        </div>
-                    )}
+                                <Button
+                                    onClick={() => handleSubscribe(tier.name)}
+                                    disabled={loading !== null}
+                                    className="w-full mt-6"
+                                    size="lg"
+                                    variant={isPopular ? "default" : "outline"}
+                                >
+                                    {loading === tier.name ? (
+                                        <>
+                                            <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                                            Processing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <SparklesIcon className="mr-2 h-4 w-4" />
+                                            Get Started
+                                        </>
+                                    )}
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )
+                })}
+            </div>
 
-                    {/* CTA Button */}
-                    <Button
-                        onClick={handleSubscribe}
-                        disabled={loading}
-                        className="w-full"
-                        size="lg"
-                    >
-                        {loading ? (
-                            <>
-                                <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                                Processing...
-                            </>
-                        ) : (
-                            <>
-                                <SparklesIcon className="mr-2 h-4 w-4" />
-                                Get Started
-                            </>
-                        )}
-                    </Button>
-
-                    <p className="text-center text-xs text-muted-foreground">
-                        Secure payment via Stripe. Cancel anytime.
-                    </p>
-                </CardContent>
-            </Card>
+            <p className="text-center text-xs text-muted-foreground mt-6">
+                Secure payment via Stripe. Cancel anytime.
+            </p>
         </div>
     )
 }

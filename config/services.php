@@ -38,6 +38,7 @@ return [
     'hetzner' => [
         'token' => env('HETZNER_API_TOKEN'),
         'mock' => env('HETZNER_MOCK', true),
+        'snapshot_id' => env('HETZNER_SNAPSHOT_ID'),
     ],
 
     'stripe' => [
@@ -46,6 +47,12 @@ return [
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
         'price_id' => env('STRIPE_PRICE_ID'),
         'mock' => env('STRIPE_MOCK', true),
+        'credits_per_dollar' => 250, // 1 credit = $0.004 of AI API cost
+        'tiers' => [
+            'starter' => ['price' => 15, 'credits' => 1000, 'stripe_price_id' => env('STRIPE_PRICE_STARTER')],
+            'pro'     => ['price' => 39, 'credits' => 3000, 'stripe_price_id' => env('STRIPE_PRICE_PRO')],
+            'beast'   => ['price' => 89, 'credits' => 8000, 'stripe_price_id' => env('STRIPE_PRICE_BEAST')],
+        ],
     ],
 
     'mailcow' => [
@@ -58,6 +65,36 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URL', '/auth/google/callback'),
+    ],
+
+    'apple' => [
+        'bundle_id' => env('APPLE_BUNDLE_ID', 'com.cloudclaw.app'),
+    ],
+
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+    ],
+
+    'revenuecat' => [
+        'api_key' => env('REVENUECAT_API_KEY'),
+        'webhook_auth_key' => env('REVENUECAT_WEBHOOK_AUTH_KEY'),
+    ],
+
+    'unipile' => [
+        'api_key' => env('UNIPILE_API_KEY'),
+        'dsn' => env('UNIPILE_DSN'),
+        'telegram_account_id' => env('UNIPILE_TELEGRAM_ACCOUNT_ID'),
+    ],
+
+    'docker' => [
+        'host_ip' => env('DOCKER_HOST_IP'),
+        'enabled' => env('DOCKER_DEPLOY_ENABLED', false),
+        'memory_limit' => env('DOCKER_MEMORY_LIMIT', '1g'),
+        'cpu_limit' => env('DOCKER_CPU_LIMIT', '1'),
+        'max_containers' => (int) env('DOCKER_MAX_CONTAINERS', 12),
+        'min_available_slots' => (int) env('DOCKER_MIN_AVAILABLE_SLOTS', 3),
+        'host_server_type' => env('DOCKER_HOST_SERVER_TYPE', 'cpx42'),
+        'host_location' => env('DOCKER_HOST_LOCATION', 'hel1'),
     ],
 
 ];

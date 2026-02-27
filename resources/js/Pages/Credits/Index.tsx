@@ -106,7 +106,7 @@ function CreditsIndex({
 
     const handlePurchase = async (amount: number) => {
         if (!amount || amount < 5) {
-            setMessage({ type: 'error', text: 'Minimum amount is €5' });
+            setMessage({ type: 'error', text: 'Minimum amount is $5' });
             return;
         }
 
@@ -132,7 +132,7 @@ function CreditsIndex({
 
             if (data.mock || data.success) {
                 const label = creditType === 'llm' ? 'LLM credits' : 'server credits';
-                setMessage({ type: 'success', text: `€${amount} ${label} added successfully!` });
+                setMessage({ type: 'success', text: `$${amount} ${label} added successfully!` });
                 router.reload();
                 return;
             }
@@ -198,7 +198,7 @@ function CreditsIndex({
                             <ServerIcon className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">€{Number(serverBalance).toFixed(2)}</div>
+                            <div className="text-2xl font-bold">${Number(serverBalance).toFixed(2)}</div>
                             <p className="text-xs text-muted-foreground">
                                 For hosting your assistants
                             </p>
@@ -234,7 +234,7 @@ function CreditsIndex({
                                 </div>
                             ) : (
                                 <>
-                                    <div className="text-2xl font-bold">€{Number(llmBalance).toFixed(2)}</div>
+                                    <div className="text-2xl font-bold">${Number(llmBalance).toFixed(2)}</div>
                                     <p className="text-xs text-muted-foreground">
                                         For AI features
                                     </p>
@@ -319,16 +319,15 @@ function CreditsIndex({
                                                 setSelectedPackage(pkg.amount);
                                                 setCustomAmount('');
                                             }}
-                                            className={`relative p-4 rounded-lg border transition-all text-center ${
-                                                selectedPackage === pkg.amount
-                                                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                                                    : 'border-border hover:border-muted-foreground/50'
-                                            }`}
+                                            className={`relative p-4 rounded-lg border transition-all text-center ${selectedPackage === pkg.amount
+                                                ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                                : 'border-border hover:border-muted-foreground/50'
+                                                }`}
                                         >
                                             <div className="text-lg font-semibold">{pkg.label}</div>
                                             {pkg.bonus > 0 && (
                                                 <Badge className="absolute -top-2 -right-2 text-xs" variant="default">
-                                                    +€{pkg.bonus}
+                                                    +${pkg.bonus}
                                                 </Badge>
                                             )}
                                         </button>
@@ -336,7 +335,7 @@ function CreditsIndex({
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm text-muted-foreground">Custom amount (€)</label>
+                                    <label className="text-sm text-muted-foreground">Custom amount ($)</label>
                                     <Input
                                         type="number"
                                         min="5"
@@ -347,7 +346,7 @@ function CreditsIndex({
                                             setCustomAmount(e.target.value);
                                             setSelectedPackage(null);
                                         }}
-                                        placeholder="Minimum €5"
+                                        placeholder="Minimum $5"
                                     />
                                 </div>
 
@@ -361,7 +360,7 @@ function CreditsIndex({
                                     ) : (
                                         <ServerIcon className="mr-2 h-4 w-4" />
                                     )}
-                                    {loading ? 'Processing...' : `Buy €${purchaseAmount.toFixed(2)} ${creditType === 'llm' ? 'LLM' : 'server'} credits`}
+                                    {loading ? 'Processing...' : `Buy $${purchaseAmount.toFixed(2)} ${creditType === 'llm' ? 'LLM' : 'server'} credits`}
                                 </Button>
 
                                 <p className="text-sm text-muted-foreground text-center">
@@ -427,13 +426,12 @@ function CreditsIndex({
                                             <TableCell className="text-sm text-muted-foreground">
                                                 {new Date(tx.created_at).toLocaleDateString()}
                                             </TableCell>
-                                            <TableCell className={`text-right font-medium text-sm ${
-                                                Number(tx.amount) >= 0 ? 'text-green-600' : 'text-red-600'
-                                            }`}>
-                                                {Number(tx.amount) >= 0 ? '+' : ''}€{Number(tx.amount).toFixed(2)}
+                                            <TableCell className={`text-right font-medium text-sm ${Number(tx.amount) >= 0 ? 'text-green-600' : 'text-red-600'
+                                                }`}>
+                                                {Number(tx.amount) >= 0 ? '+' : ''}${Number(tx.amount).toFixed(2)}
                                             </TableCell>
                                             <TableCell className="text-right text-sm">
-                                                €{Number(tx.balance_after).toFixed(2)}
+                                                ${Number(tx.balance_after).toFixed(2)}
                                             </TableCell>
                                         </TableRow>
                                     ))}

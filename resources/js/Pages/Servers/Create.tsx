@@ -93,11 +93,10 @@ export default function CreateServer({ serverTypes, datacenters }: Props) {
                                         {serverTypes.map((type) => (
                                             <div
                                                 key={type.name}
-                                                className={`relative flex cursor-pointer rounded-lg border p-4 ${
-                                                    data.server_type === type.name
-                                                        ? 'border-primary bg-primary/5'
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                }`}
+                                                className={`relative flex cursor-pointer rounded-lg border p-4 ${data.server_type === type.name
+                                                    ? 'border-primary bg-primary/5'
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                                    }`}
                                                 onClick={() => setData('server_type', type.name)}
                                             >
                                                 <div className="flex w-full items-center justify-between">
@@ -111,9 +110,9 @@ export default function CreateServer({ serverTypes, datacenters }: Props) {
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        <p className="font-medium">€{type.hourly_rate.toFixed(4)}/hr</p>
+                                                        <p className="font-medium">${type.hourly_rate.toFixed(4)}/hr</p>
                                                         <p className="text-sm text-muted-foreground">
-                                                            ~€{type.monthly_estimate.toFixed(2)}/mo
+                                                            ~${type.monthly_estimate.toFixed(2)}/mo
                                                         </p>
                                                     </div>
                                                 </div>
@@ -122,7 +121,7 @@ export default function CreateServer({ serverTypes, datacenters }: Props) {
                                                     name="server_type"
                                                     value={type.name}
                                                     checked={data.server_type === type.name}
-                                                    onChange={() => {}}
+                                                    onChange={() => { }}
                                                     className="sr-only"
                                                 />
                                             </div>
@@ -140,11 +139,10 @@ export default function CreateServer({ serverTypes, datacenters }: Props) {
                                         {datacenters.map((dc) => (
                                             <div
                                                 key={dc.id}
-                                                className={`relative flex cursor-pointer rounded-lg border p-3 ${
-                                                    data.datacenter === dc.id
-                                                        ? 'border-primary bg-primary/5'
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                }`}
+                                                className={`relative flex cursor-pointer rounded-lg border p-3 ${data.datacenter === dc.id
+                                                    ? 'border-primary bg-primary/5'
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                                    }`}
                                                 onClick={() => setData('datacenter', dc.id)}
                                             >
                                                 <div>
@@ -156,7 +154,7 @@ export default function CreateServer({ serverTypes, datacenters }: Props) {
                                                     name="datacenter"
                                                     value={dc.id}
                                                     checked={data.datacenter === dc.id}
-                                                    onChange={() => {}}
+                                                    onChange={() => { }}
                                                     className="sr-only"
                                                 />
                                             </div>
@@ -178,11 +176,11 @@ export default function CreateServer({ serverTypes, datacenters }: Props) {
                                             </div>
                                             <div className="flex justify-between">
                                                 <span>Hourly Rate:</span>
-                                                <span className="font-medium">€{selectedType.hourly_rate.toFixed(4)}</span>
+                                                <span className="font-medium">${selectedType.hourly_rate.toFixed(4)}</span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span>Estimated Monthly:</span>
-                                                <span className="font-medium">€{selectedType.monthly_estimate.toFixed(2)}</span>
+                                                <span className="font-medium">${selectedType.monthly_estimate.toFixed(2)}</span>
                                             </div>
                                         </div>
                                     </div>
